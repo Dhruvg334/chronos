@@ -1,0 +1,3 @@
+-- Migration: 001_create_user_profiles.sql
+-- Status: Placeholder for Phase 0
+-- Description: Core user preferences and auto-provisioning triggers from auth.users.

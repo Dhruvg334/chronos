@@ -1,45 +1,31 @@
-# dependencies
+# Node / Frontend
 node_modules/
-frontend/node_modules/
-backend/.venv/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+
+# Python / Backend
 venv/
 .venv/
-
-# env files
-.env
-.env.local
-.env.*.local
-frontend/.env
-frontend/.env.local
-backend/.env
-
-# Python
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
-.ruff_cache/
 
-# builds
-dist/
-frontend/dist/
-build/
-coverage/
+# Environments
+.env
+.env.production
+.env.local
 
-# OS/editor
-.DS_Store
-Thumbs.db
+# IDEs and OS files
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
 
-# Supabase local
-supabase/.branches/
-supabase/.temp/
-
-# logs
-*.log
-logs/
-
-# secrets
-*.pem
-*.key
+# System Cache
+.gemini/
+.agents/
