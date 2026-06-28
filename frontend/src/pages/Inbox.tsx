@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import AppShell from '../components/layout/AppShell';
 import { ExtractionReview } from '../components/intake/ExtractionReview';
-import { CommitmentDraft, IntakeResponse } from '../types/api';
+import type { IntakeResponse } from '../types/api';
 
 const MOCK_PROMPTS = {
   hackathon: "I have a hackathon this weekend starting Friday at 6pm and ending Sunday at 2pm. I need to finish the database schema by Saturday morning, build the UI by Saturday night, and prepare the pitch deck on Sunday. I also have a quick 30m sync with my team on Friday at 8pm.",

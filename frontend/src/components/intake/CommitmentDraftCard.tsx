@@ -1,5 +1,5 @@
 import React from 'react';
-import { CommitmentDraft } from '../../types/api';
+import type { CommitmentDraft } from '../../types/api';
 
 interface CommitmentDraftCardProps {
   draft: CommitmentDraft;
@@ -97,7 +97,7 @@ export const CommitmentDraftCard: React.FC<CommitmentDraftCardProps> = ({ draft,
         </div>
       )}
 
-      {draft.tasks.length > 0 && (
+      {(draft.tasks?.length ?? 0) > 0 && (
         <div className="mt-4 border-t border-[#E5E0D8] pt-3">
           <label className="block text-xs font-medium text-[#7A7771] mb-2">Detected Tasks</label>
           <ul className="space-y-1">

@@ -17,3 +17,7 @@ Frontend Agent Console uses simple HTTP polling to `GET /api/v1/agent/runs/{id}/
 
 ## 5. Temporary Dev Auth
 Uses a lightweight dependency mock relying on `DEV_USER_ID` environment variable to link `user_id` context until Supabase JWT middleware is complete. This ensures `user_id` is never passed directly from the frontend request body.
+
+## 6. Technical Debt
+- **google.generativeai**: Currently using the legacy `google.generativeai` package instead of the newer `google-genai` SDK. This is a known technical debt item to be migrated in a future phase.
+- **Trace Polling**: Agent trace polling currently uses simple HTTP `setInterval` instead of an active Server-Sent Events (SSE) stream.

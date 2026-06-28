@@ -37,19 +37,18 @@ class GeminiService:
         
         try:
             if trace_logger:
-                trace_logger.log("gemini_extraction_started", {"model": model_name})
+                trace_logger.log("gemini_extraction", status="started", explanation=f"Using model {model_name}")
             
             resp = self._call_and_parse(prompt, schema, model_name, trace_logger)
             
             if trace_logger:
-                trace_logger.log("gemini_extraction_completed")
+                trace_logger.log("gemini_extraction", status="succeeded", explanation="Extraction completed")
             return resp
             
         except ValidationError as e:
             logger.warning(f"Validation failed on first attempt. Attempting repair with reasoning model. Error: {str(e)}")
             if trace_logger:
-                trace_logger.log("validation_failed", {"errors": e.errors()})
-                trace_logger.log("repair_attempted")
+                trace_logger.log("validation", status="failed", explanation="Validation failed, attempting repair", payload={"errors": e.errors()})
                 
             # Try repair loop, forcing the reasoning model for better capability
             repair_prompt = (
@@ -61,12 +60,12 @@ class GeminiService:
             try:
                 resp = self._call_and_parse(repair_prompt, schema, self.reasoning_model_name, trace_logger)
                 if trace_logger:
-                    trace_logger.log("gemini_extraction_completed", {"repaired": True})
+                    trace_logger.log("gemini_extraction", status="succeeded", explanation="Repaired extraction completed")
                 return resp
             except ValidationError as final_e:
                 logger.error(f"Repair attempt failed. Error: {str(final_e)}")
                 if trace_logger:
-                    trace_logger.log("validation_failed", {"errors": final_e.errors(), "fatal": True})
+                    trace_logger.log("validation", status="failed", explanation="Fatal validation error after repair", payload={"errors": final_e.errors()})
                 raise ValueError(f"Failed to extract structured data matching schema: {str(final_e)}")
         except Exception as ex:
             logger.error(f"Gemini API error: {str(ex)}")
@@ -96,12 +95,12 @@ class GeminiService:
         text_resp = text_resp.strip()
         
         if trace_logger:
-            trace_logger.log("validation_started")
+            trace_logger.log("validation", status="started", explanation="Starting pydantic validation")
             
         validated = schema.model_validate_json(text_resp)
         
         if trace_logger:
-            trace_logger.log("validation_succeeded")
+            trace_logger.log("validation", status="succeeded", explanation="Pydantic validation passed")
             
         return validated
 

@@ -20,7 +20,8 @@ def mock_gemini():
 def test_intake_process_success(mock_gemini, mock_supabase):
     mock_run_id = str(uuid4())
     
-    with patch("app.api.v1.intake.create_agent_run", return_value=mock_run_id):
+    with patch("app.api.v1.intake.create_agent_run", return_value=mock_run_id), \
+         patch("app.core.config.settings.GEMINI_API_KEY", "mock-key"):
         mock_gemini.extract_structured.return_value = IntakeResponse(
             agent_run_id=mock_run_id,
             drafts=[],

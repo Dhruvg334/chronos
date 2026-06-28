@@ -109,32 +109,46 @@ chronos/
 - **Phase 1**: Database setup (Supabase migrations, RLS, triggers).
 - **Phase 2**: AI Intake Loop, Brain Dump Extraction with Gemini, Risk Scoring, and Command Canvas initialization.
 
-### Environment Setup
-1. Copy `.env.example` to `.env` in both root and `backend/`.
-2. Add your `GEMINI_API_KEY`.
-3. Set `DEV_USER_ID` to your test user's UUID (from `docs/chronos/DB_VERIFICATION.md`) if bypassing auth middleware during dev.
+### Phase 2 Local Runbook
 
-### Running Local Environment
-**Database:**
+**1. Database Configuration**
 ```bash
+# Start local Supabase (ignores known analytics container issue)
 npx supabase start --ignore-health-check
 ```
-*Note: `--ignore-health-check` is required locally due to a known issue with the Supabase Logflare analytics container.*
+*Run `npx supabase status` and copy `API URL`, `anon key`, and `service_role key`.*
 
-**Backend:**
+**2. Environment Configuration**
+* Copy `.env.example` to `.env` in the root folder.
+* Copy `backend/.env.example` to `backend/.env`.
+* Fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (backend only), and `GEMINI_API_KEY` (backend only).
+* Set `DEV_USER_ID` in `backend/.env` using a UUID from `docs/chronos/DB_VERIFICATION.md` for Dev Auth bypass.
+
+**3. Start Backend & Tests**
 ```bash
 cd backend
 python -m venv venv
-source venv/Scripts/activate # Windows
+venv\Scripts\activate # Windows
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+python -m pytest
+python -m uvicorn app.main:app --reload
 ```
 
-**Frontend:**
+**4. Start Frontend**
 ```bash
+# Open a new terminal
+cd frontend
 npm install
+npm run build
 npm run dev
 ```
+
+**5. Manual Test Flow**
+1. Open `http://localhost:5173/inbox`.
+2. Click the "Hackathon Week" quick prompt and submit.
+3. Review the AI-extracted commitment drafts and observe the trace logs in the Agent Console.
+4. Approve the commitments.
+5. Navigate to `http://localhost:5173/command` to view your saved commitments, risk levels, and basic time spines.
 
 ---
 

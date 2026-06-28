@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CommitmentDraft, ApproveCommitmentsRequest } from '../../types/api';
+import type { CommitmentDraft, ApproveCommitmentsRequest } from '../../types/api';
 import { CommitmentDraftCard } from './CommitmentDraftCard';
 import { AgentConsole } from '../agent/AgentConsole';
 

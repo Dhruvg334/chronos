@@ -33,9 +33,9 @@ async def health_check():
     return {
         "status": "healthy",
         "environment": settings.ENV,
-        "database_connected": db_ok,
-        "google_oauth_configured": bool(settings.GOOGLE_CLIENT_ID),
-        "gemini_api_configured": bool(settings.GEMINI_API_KEY)
+        "supabase_configured": db_ok,
+        "gemini_configured": bool(settings.GEMINI_API_KEY),
+        "google_oauth_configured": bool(settings.GOOGLE_CLIENT_ID)
     }
 
 # Include v1 Routers
