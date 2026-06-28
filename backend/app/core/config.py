@@ -6,8 +6,11 @@ class Settings(BaseSettings):
     ENV: str = "development"
     PORT: int = 8000
     
-    # Gemini API Key
+    # Gemini API Key & Models
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL_FAST: str = "gemini-2.5-flash"
+    GEMINI_MODEL_REASONING: str = "gemini-2.5-pro"
+    GEMINI_MODEL_DEFAULT: str = "gemini-2.5-flash"
     
     # Supabase Connection Keys
     SUPABASE_URL: str = ""

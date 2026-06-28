@@ -136,15 +136,15 @@ Instead of a monolithic router, we construct six dedicated graphs:
 
 ## 5. Development Phases & Verification Plan
 
-### Phase 1: Local Setup & Core Database Schema
-* **Files to create first**: `/supabase/migrations/*.sql`, `/backend/.env.example`
+### [COMPLETED] Phase 1: Local Setup & Core Database Schema
+* **Files created**: `/supabase/migrations/*.sql`, `/backend/app/core/database.py`, `/docs/chronos/DB_VERIFICATION.md`
 * **Tasks**: Scaffold directories. Initialize migrations. Connect backend to local Supabase.
 * **Verification**: Run migrations. Confirm RLS blocks unauthenticated access and verify the auto-profile trigger adds profile rows upon registration.
 
-### Phase 2: Core Vertical Loop (Mock Calendar Capacity)
-* **Files to create**: `/backend/app/api/v1/commitments.py`, `/backend/app/agents/nodes/intake.py`, `/frontend/src/pages/Inbox.tsx`
-* **Tasks**: Implement text extraction using Gemini + Pydantic schema validation. Set up fallback repair loops. Build the Inbox UI page displaying parsed cards.
-* **Verification**: Pass raw paragraphs into the API and verify that parsed commitments are generated and editable in the UI.
+### [COMPLETED] Phase 2: Core Vertical Loop (Mock Calendar Capacity)
+* **Files created**: `/backend/app/api/v1/intake.py`, `/backend/app/schemas/intake.py`, `/backend/app/services/gemini_service.py`, frontend components (`ExtractionReview.tsx`, `CommitmentDraftCard.tsx`).
+* **Tasks**: Implemented Brain Dump extraction using Gemini + Pydantic schema validation with a 1-retry repair loop. Built the Inbox UI page displaying parsed drafts. Implemented mock capacity calculation and deterministic risk scoring. Created the `/command` view.
+* **Verification**: Verified using the automated pytest suite and manual testing on the local UI.
 
 ### Phase 3: Risk Modeling & Time Spine Engine
 * **Files to create**: `/backend/app/services/risk_service.py`, `/frontend/src/components/canvas/TimeSpinePanel.tsx`

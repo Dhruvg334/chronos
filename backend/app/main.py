@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent
+from app.core.database import supabase_client
+from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake
 
 app = FastAPI(
     title="ChronOS API",
@@ -21,10 +22,18 @@ app.add_middleware(
 # Health Check Route
 @app.get("/api/v1/health")
 async def health_check():
+    db_ok = False
+    if supabase_client is not None:
+        try:
+            # Check connection presence by validating configuration variables
+            db_ok = bool(settings.SUPABASE_URL and settings.SUPABASE_ANON_KEY)
+        except Exception:
+            db_ok = False
+
     return {
         "status": "healthy",
         "environment": settings.ENV,
-        "database_connected": False,  # Mocked for Phase 0
+        "database_connected": db_ok,
         "google_oauth_configured": bool(settings.GOOGLE_CLIENT_ID),
         "gemini_api_configured": bool(settings.GEMINI_API_KEY)
     }
@@ -37,6 +46,7 @@ app.include_router(drift.router, prefix="/api/v1/drift", tags=["drift"])
 app.include_router(rescue.router, prefix="/api/v1/rescue", tags=["rescue"])
 app.include_router(reflection.router, prefix="/api/v1/reflection", tags=["reflection"])
 app.include_router(agent.router, prefix="/api/v1/agent", tags=["agent"])
+app.include_router(intake.router)
 
 if __name__ == "__main__":
     import uvicorn

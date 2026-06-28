@@ -1,69 +1,74 @@
+import React, { useState, useEffect } from 'react';
 import AppShell from '../components/layout/AppShell';
 
 export default function Command() {
+  const [commitments, setCommitments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/v1/commitments')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setCommitments(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
   return (
     <AppShell>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        {/* Left Column: Time Spine Panel placeholder */}
-        <div className="lg:col-span-1 bg-warm-cream border border-warm-border rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold mb-2">Time Spine</h3>
-            <p className="text-sm text-text-secondary">Your commitments mapped as a chronological axis.</p>
-          </div>
-          <div className="border border-dashed border-warm-border rounded-xl h-64 flex items-center justify-center text-text-muted text-xs">
-            [TimeSpine Visual Placeholder — Phase 0]
-          </div>
+      <div className="flex flex-col h-full space-y-6">
+        <div>
+          <h2 className="text-3xl font-extrabold text-[#2C2B29] mb-2">Command Canvas</h2>
+          <p className="text-[#5C5A56]">Your structured commitments and their time spines.</p>
         </div>
 
-        {/* Center Column: Active Focus Console placeholder */}
-        <div className="lg:col-span-1 bg-warm-cream border border-warm-border rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold mb-2 text-accent-terracotta">Active Focus Console</h3>
-            <p className="text-sm text-text-secondary">Your current action contract is displayed here.</p>
+        {loading ? (
+          <div className="text-[#7A7771]">Loading commitments...</div>
+        ) : commitments.length === 0 ? (
+          <div className="p-8 text-center text-[#7A7771] border border-dashed border-[#D1CCC2] rounded-xl bg-[#FAF9F6]">
+            No active commitments found. Go to Inbox to compile some.
           </div>
-          <div className="bg-white border border-warm-border rounded-xl p-4 my-4 flex-1 flex flex-col items-center justify-center text-center">
-            <h4 className="font-semibold text-base mb-1">Study for Exam</h4>
-            <span className="text-xs text-text-muted mb-4">Done condition: Finish 2 modules</span>
-            <div className="text-3xl font-mono font-bold mb-4 text-text-primary">45:00</div>
-            <button disabled className="px-4 py-2 bg-warm-surface border border-warm-border rounded-full text-xs text-text-muted font-medium">
-              Start Block
-            </button>
-          </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {commitments.map(c => (
+              <div key={c.id} className="bg-[#FAF9F6] border border-[#E5E0D8] rounded-xl p-5 shadow-sm">
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-xl font-semibold text-[#2C2B29]">{c.title}</h3>
+                  <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${
+                    c.risk_level === 'rescue_required' ? 'bg-[#993333] text-white' :
+                    c.risk_level === 'critical' ? 'bg-[#CC6633] text-white' :
+                    c.risk_level === 'at_risk' ? 'bg-[#D1CCC2] text-[#2C2B29]' :
+                    c.risk_level === 'watch' ? 'bg-[#FDF3E1] text-[#997328]' :
+                    'bg-[#EAF3EA] text-[#3D663D]'
+                  }`}>
+                    {c.risk_level.replace('_', ' ')}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm text-[#7A7771] mb-4">
+                  <div><strong>Effort:</strong> {c.estimated_effort_minutes || '?'} mins</div>
+                  <div><strong>Deadline:</strong> {c.deadline_at ? new Date(c.deadline_at).toLocaleDateString() : 'None'}</div>
+                </div>
 
-        {/* Right Column: Agent Console placeholder */}
-        <div className="lg:col-span-1 bg-warm-cream border border-warm-border rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold mb-2 text-accent-amber">Agent Console</h3>
-            <p className="text-sm text-text-secondary">Explainable reasoning logs from background runners.</p>
+                <div className="mt-4 pt-4 border-t border-[#E5E0D8]">
+                  <h4 className="text-xs font-semibold text-[#5C5A56] uppercase tracking-wider mb-2">Basic Time Spine</h4>
+                  <div className="flex flex-col gap-2">
+                    {c.time_spines?.[0]?.checkpoints_json?.map((checkpoint: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-[#4A4844]">
+                        <span className={`w-2 h-2 rounded-full ${checkpoint.status === 'completed' ? 'bg-[#3D663D]' : 'bg-[#D1CCC2]'}`}></span>
+                        <span className={checkpoint.status === 'completed' ? 'line-through text-[#998877]' : ''}>{checkpoint.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="bg-text-primary text-warm-ivory font-mono text-xs rounded-xl p-4 h-64 overflow-y-auto space-y-2 mt-4">
-            <p className="text-text-muted">[21:42:01] Initializing Agent Console...</p>
-            <p className="text-accent-amber">[21:42:02] Trace stream active (Mocked)</p>
-            <p className="text-accent-amber">[21:42:03] Standby: Ready for commitments</p>
-          </div>
-        </div>
-
-        {/* Bottom row: Drift Radar & Decision Dock */}
-        <div className="lg:col-span-3 bg-warm-cream border border-warm-border rounded-2xl p-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className="text-lg font-bold">Drift Radar & Decision Dock</h3>
-              <p className="text-sm text-text-secondary">Compare plan vs. actual performance deviations.</p>
-            </div>
-            <span className="px-3 py-1 bg-risk-stable text-white text-xs font-semibold rounded-full">
-              Stable
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white border border-warm-border rounded-xl p-4 flex items-center justify-center text-xs text-text-muted h-24">
-              [Drift Logs List — Phase 0]
-            </div>
-            <div className="bg-white border border-warm-border rounded-xl p-4 flex items-center justify-center text-xs text-text-muted h-24">
-              [Pending Approvals Queue — Phase 0]
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </AppShell>
   );

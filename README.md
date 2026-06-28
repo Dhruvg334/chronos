@@ -105,30 +105,36 @@ chronos/
    cd backend
    ```
 2. Create a virtual environment and install dependencies:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-3. Copy `.env.example` to `.env` and fill in your Supabase, Google Client OAuth, and Gemini API keys.
-4. Run the server:
-   ```bash
-   uvicorn app.main:app --reload --port 8000
-   ```
+## Status: Phase 2 Completed
+- **Phase 1**: Database setup (Supabase migrations, RLS, triggers).
+- **Phase 2**: AI Intake Loop, Brain Dump Extraction with Gemini, Risk Scoring, and Command Canvas initialization.
 
-### 5.3 Frontend Installation
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-2. Install packages:
-   ```bash
-   npm install
-   ```
-3. Start the Vite server:
-   ```bash
-   npm run dev
-   ```
+### Environment Setup
+1. Copy `.env.example` to `.env` in both root and `backend/`.
+2. Add your `GEMINI_API_KEY`.
+3. Set `DEV_USER_ID` to your test user's UUID (from `docs/chronos/DB_VERIFICATION.md`) if bypassing auth middleware during dev.
+
+### Running Local Environment
+**Database:**
+```bash
+npx supabase start --ignore-health-check
+```
+*Note: `--ignore-health-check` is required locally due to a known issue with the Supabase Logflare analytics container.*
+
+**Backend:**
+```bash
+cd backend
+python -m venv venv
+source venv/Scripts/activate # Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+**Frontend:**
+```bash
+npm install
+npm run dev
+```
 
 ---
 
