@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import supabase_client
-from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake, google, scheduling, command
+from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake, google, scheduling, command, demo
 
 app = FastAPI(
     title="ChronOS API",
@@ -49,6 +49,7 @@ app.include_router(reflection.router, prefix="/api/v1/reflection", tags=["reflec
 app.include_router(agent.router, prefix="/api/v1/agent", tags=["agent"])
 app.include_router(scheduling.router, prefix="/api/v1/scheduling", tags=["scheduling"])
 app.include_router(command.router, prefix="/api/v1/command", tags=["command"])
+app.include_router(demo.router, prefix="/api/v1/demo", tags=["demo"])
 from app.api.v1.focus_blocks import router as fb_router
 app.include_router(fb_router, prefix="/api/v1/focus-blocks", tags=["focus_blocks"])
 app.include_router(intake.router)

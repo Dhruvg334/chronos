@@ -2,7 +2,7 @@ import { LayoutDashboard, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface EmptyStateProps {
-  onLoadDemo: () => void;
+  onLoadDemo: () => Promise<void>;
 }
 
 export function EmptyState({ onLoadDemo }: EmptyStateProps) {
@@ -27,7 +27,10 @@ export function EmptyState({ onLoadDemo }: EmptyStateProps) {
           <ArrowRight className="w-4 h-4" />
         </button>
         <button
-          onClick={onLoadDemo}
+          onClick={() => {
+            const confirmed = window.confirm('Load the Judge Demo scenario? This will replace existing demo-tagged records, but it will not delete your real commitments.');
+            if (confirmed) void onLoadDemo();
+          }}
           className="px-6 py-3 font-semibold text-slate-300 bg-slate-800 rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
           Load Judge Demo

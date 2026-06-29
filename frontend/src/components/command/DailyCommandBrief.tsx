@@ -7,6 +7,11 @@ export interface CommandBriefData {
   available_minutes_today: number;
   rescue_candidate_count: number;
   schedule_proposal_count: number;
+  rescue_proposal_count?: number;
+  pending_approval_count?: number;
+  estimated_minutes_due_soon?: number;
+  top_risk_title?: string | null;
+  warnings?: string[];
   next_best_action: string;
 }
 
@@ -72,7 +77,7 @@ export function DailyCommandBrief({ brief }: DailyCommandBriefProps) {
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-6 h-6 text-purple-400" />
             <span className="text-xl font-bold text-white">
-              {brief.schedule_proposal_count} <span className="text-sm font-normal text-slate-400">actions</span>
+              {brief.pending_approval_count ?? brief.schedule_proposal_count} <span className="text-sm font-normal text-slate-400">actions</span>
             </span>
           </div>
           <p className="text-xs text-slate-500">{brief.rescue_candidate_count > 0 ? `${brief.rescue_candidate_count} rescue candidates detected.` : 'No critical rescues needed.'}</p>
@@ -87,6 +92,23 @@ export function DailyCommandBrief({ brief }: DailyCommandBriefProps) {
           </div>
         </div>
       </div>
+
+      {(brief.top_risk_title || brief.estimated_minutes_due_soon || (brief.warnings && brief.warnings.length > 0)) && (
+        <div className="mt-6 pt-5 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-slate-500 text-xs uppercase tracking-wider font-bold mb-1">Top Risk</p>
+            <p className="text-slate-300">{brief.top_risk_title || 'No active risk surfaced.'}</p>
+          </div>
+          <div>
+            <p className="text-slate-500 text-xs uppercase tracking-wider font-bold mb-1">Due Soon Load</p>
+            <p className="text-slate-300">{brief.estimated_minutes_due_soon ?? 0} minutes in the next 24h</p>
+          </div>
+          <div>
+            <p className="text-slate-500 text-xs uppercase tracking-wider font-bold mb-1">Analysis Warnings</p>
+            <p className="text-slate-300">{brief.warnings && brief.warnings.length > 0 ? brief.warnings[0] : 'None'}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

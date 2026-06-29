@@ -87,9 +87,6 @@ export default function Command() {
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      // Create schedule plan automatically as part of analysis (without approving)
-      await fetch(apiUrl('/api/v1/scheduling/plan'), { method: 'POST' });
-      
       const res = await fetch(apiUrl('/api/v1/command/analyze'), { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
@@ -105,7 +102,8 @@ export default function Command() {
 
   const handleLoadDemo = async () => {
     try {
-      await fetch(apiUrl('/api/v1/demo/load'), { method: 'POST' });
+      const res = await fetch(apiUrl('/api/v1/demo/load'), { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to load judge demo');
       await refreshAll();
       setBrief(null);
     } catch (err) {
