@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import supabase_client
-from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake
+from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake, google
 
 app = FastAPI(
     title="ChronOS API",
@@ -42,6 +42,7 @@ async def health_check():
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(commitments.router, prefix="/api/v1/commitments", tags=["commitments"])
 app.include_router(calendar.router, prefix="/api/v1/calendar", tags=["calendar"])
+app.include_router(google.router, prefix="/api/v1/google", tags=["google"])
 app.include_router(drift.router, prefix="/api/v1/drift", tags=["drift"])
 app.include_router(rescue.router, prefix="/api/v1/rescue", tags=["rescue"])
 app.include_router(reflection.router, prefix="/api/v1/reflection", tags=["reflection"])

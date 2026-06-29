@@ -5,6 +5,7 @@ from app.services.risk_service import calculate_initial_risk
 def test_risk_missing_deadline():
     current_time = datetime.now(timezone.utc)
     score, level, warnings = calculate_initial_risk(
+        user_id="test_user",
         current_time=current_time,
         deadline_at=None,
         estimated_minutes=120
@@ -15,6 +16,7 @@ def test_risk_missing_deadline():
 def test_risk_missing_effort():
     current_time = datetime.now(timezone.utc)
     score, level, warnings = calculate_initial_risk(
+        user_id="test_user",
         current_time=current_time,
         deadline_at=current_time + timedelta(days=2),
         estimated_minutes=None
@@ -25,6 +27,7 @@ def test_risk_missing_effort():
 def test_risk_overdue():
     current_time = datetime.now(timezone.utc)
     score, level, warnings = calculate_initial_risk(
+        user_id="test_user",
         current_time=current_time,
         deadline_at=current_time - timedelta(days=1),
         estimated_minutes=120,
@@ -36,6 +39,7 @@ def test_risk_overdue():
 def test_risk_stable():
     current_time = datetime.now(timezone.utc)
     score, level, warnings = calculate_initial_risk(
+        user_id="test_user",
         current_time=current_time,
         deadline_at=current_time + timedelta(days=10),
         estimated_minutes=30, # Small effort, lots of time
@@ -50,6 +54,7 @@ def test_risk_stable():
 def test_risk_critical():
     current_time = datetime.now(timezone.utc)
     score, level, warnings = calculate_initial_risk(
+        user_id="test_user",
         current_time=current_time,
         deadline_at=current_time + timedelta(minutes=120),
         estimated_minutes=120, # High effort, no time
@@ -65,6 +70,7 @@ def test_risk_capacity_escalation():
     # If effort exceeds capacity
     current_time = datetime.now(timezone.utc)
     score, level, warnings = calculate_initial_risk(
+        user_id="test_user",
         current_time=current_time,
         deadline_at=current_time + timedelta(hours=24), # 1 day
         estimated_minutes=1000, # Much more than 1 day's capacity (240)

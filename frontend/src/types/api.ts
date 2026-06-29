@@ -150,3 +150,19 @@ export interface CommitmentDetailResponse extends SavedCommitment {
   reflections: ReflectionSchema[];
   current_stage?: string | null;
 }
+
+export interface GoogleConnectionStatus {
+  connected: boolean;
+  email?: string;
+  scopes?: string[];
+  last_synced_at?: string;
+}
+
+export interface CapacityAvailability {
+  capacity_source: "google_calendar" | "mock";
+  available_minutes: number;
+  focus_windows: any[];
+  busy_blocks_count: number;
+  fallback_reason?: string;
+}
+

@@ -8,6 +8,16 @@ Configured via `.env` to avoid hardcoding models.
 `GEMINI_MODEL_FAST` (gemini-2.5-flash) is used for initial extraction.
 `GEMINI_MODEL_REASONING` (gemini-2.5-pro) is triggered only during the 1-retry repair loop if Pydantic validation fails on the fast model's output.
 
+### AD-006: Frontend Extensibility without Server-Side Rendering
+- **Context**: Future plugins and dynamic UI.
+- **Decision**: Vite + React single-page app (SPA). No Next.js or SSR is required, ensuring maximum speed for backend API iteration. All complex logic lives in FastAPI, not the UI. 
+
+### AD-007: OAuth Token Storage & Security
+- **Context**: Need to securely store Google Calendar OAuth tokens without leaking them in standard tables or frontend requests.
+- **Decision**: Use Supabase Vault (`pgsodium` / `supabase_vault`). Store encrypted tokens in `vault.secrets` and only retain `access_token_secret_id` and `refresh_token_secret_id` inside `public.google_connections`.
+- **Implementation**: Access to Vault is wrapped in `SECURITY DEFINER` RPC functions (`public.set_google_tokens`, `public.get_decrypted_google_tokens`).
+- **Security Constraint**: These RPC functions have their execute permissions revoked from `public` and `authenticated`, and granted EXCLUSIVELY to `service_role`. The backend FastApi uses the Service Role key to fetch tokens securely in-memory. Tokens are strictly passed transiently to Google APIs and never logged or exposed in API JSON payloads.
+
 ## 3. Deterministic Risk Initialization
 Risk is not AI-generated; it is deterministically calculated using an explicit equation taking into account effort remaining, time until deadline, importance, flexibility, and confidence.
 `risk_score = clamp(raw_score * uncertainty_factor, 0, 100)`

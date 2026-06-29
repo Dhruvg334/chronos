@@ -6,12 +6,14 @@ import { apiUrl } from '../lib/api';
 import AppShell from '../components/layout/AppShell';
 import ReflectionModal from '../components/command/ReflectionModal';
 import SkipModal from '../components/command/SkipModal';
-import type { SavedCommitment, CommitmentDetailResponse, NormalizedTimeSpineStage } from '../types/api';
+import { CalendarConnection } from '../components/command/CalendarConnection';
+import type { SavedCommitment, CommitmentDetailResponse, NormalizedTimeSpineStage, CapacityAvailability } from '../types/api';
 
 export default function Command() {
   const [commitments, setCommitments] = useState<SavedCommitment[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CommitmentDetailResponse | null>(null);
+  const [capacity, setCapacity] = useState<CapacityAvailability | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +55,21 @@ export default function Command() {
     }
   };
 
+  const fetchCapacity = async () => {
+    try {
+      const res = await fetch(apiUrl('/api/v1/calendar/capacity'));
+      if (res.ok) {
+        const data = await res.json();
+        setCapacity(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchCommitments();
+    fetchCapacity();
   }, []);
 
   useEffect(() => {
@@ -153,6 +168,21 @@ export default function Command() {
       <div className="flex h-full gap-6">
         {/* Sidebar: Commitments List */}
         <div className="w-1/3 flex flex-col gap-4 border-r border-[#E5E0D8] pr-4 overflow-y-auto">
+          <CalendarConnection />
+          
+          {capacity && (
+            <div className="bg-[#FAF9F6] border border-[#E5E0D8] rounded-xl p-4 shadow-sm">
+              <h3 className="text-sm font-bold text-[#2C2B29] mb-1">Today's Availability</h3>
+              <p className="text-xs text-[#7A7771] mb-2">
+                Source: {capacity.capacity_source === 'google_calendar' ? 'Google Calendar' : 'Mock Fallback'}
+              </p>
+              <div className="flex justify-between items-end">
+                <span className="text-2xl font-extrabold text-[#3D663D]">{capacity.available_minutes} <span className="text-sm font-medium text-[#7A7771]">mins</span></span>
+                <span className="text-xs font-medium text-[#998877]">{capacity.busy_blocks_count} busy blocks</span>
+              </div>
+            </div>
+          )}
+
           <div>
             <h2 className="text-2xl font-extrabold text-[#2C2B29] mb-1">Commitments</h2>
             <p className="text-[#7A7771] text-sm">Select a commitment to open its canvas.</p>

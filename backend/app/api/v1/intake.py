@@ -138,7 +138,8 @@ async def approve_intake(request: ApproveCommitmentsRequest, user_id: str = Depe
             start_before_at = _parse_dt(draft.start_before_at)
 
             risk_score, risk_level, warnings = calculate_initial_risk(
-                current_time=now,
+                user_id=user_id,
+                current_time=datetime.now(timezone.utc),
                 deadline_at=deadline_at,
                 estimated_minutes=draft.estimated_minutes,
                 progress_percent=0.0,

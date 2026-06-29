@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from typing import Optional, Tuple, List
-from app.services.mock_capacity_service import get_available_capacity_until
+from app.services.capacity_service import get_available_capacity_until
 
 def calculate_initial_risk(
+    user_id: str,
     current_time: datetime,
     deadline_at: Optional[datetime] = None,
     estimated_minutes: Optional[int] = None,
@@ -53,7 +54,7 @@ def calculate_initial_risk(
     level = _get_level_from_score(risk_score)
     
     # Capacity check rule
-    available_capacity = get_available_capacity_until(deadline_at, current_time, tz_str)
+    available_capacity = get_available_capacity_until(user_id, deadline_at, current_time, tz_str)
     if effort_remaining > available_capacity:
         warnings.append("Estimated effort exceeds available mock capacity before deadline.")
         level = _escalate_level(level)
@@ -119,6 +120,7 @@ def recalculate_commitment_risk(commitment: dict, current_time: datetime, skip_p
         start_before_at = start_before_at.replace(tzinfo=timezone.utc)
 
     score, level, warnings = calculate_initial_risk(
+        user_id=commitment.get("user_id", "default"),
         current_time=current_time,
         deadline_at=deadline_at,
         estimated_minutes=commitment.get("estimated_minutes"),

@@ -12,11 +12,8 @@ VALUES (
     'ask'::public.autonomy_level_type
 ) ON CONFLICT (id) DO NOTHING;
 
--- 2. Seed Google connections placeholder
-INSERT INTO public.google_connections (id, user_id, google_email, access_token, refresh_token, token_uri, client_id, scopes, expires_at)
-VALUES (
-    '11111111-1111-1111-1111-111111111111',
-    '00000000-0000-0000-0000-000000000000',
+SELECT public.set_google_tokens(
+    '00000000-0000-0000-0000-000000000000'::uuid,
     'demo@gmail.com',
     'mock_access_token',
     'mock_refresh_token',
@@ -24,7 +21,7 @@ VALUES (
     'mock_client_id.apps.googleusercontent.com',
     ARRAY['https://www.googleapis.com/auth/calendar.readonly'],
     NOW() + INTERVAL '1 hour'
-) ON CONFLICT (user_id) DO NOTHING;
+);
 
 
 -- ============================================================================

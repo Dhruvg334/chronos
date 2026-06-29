@@ -151,12 +151,17 @@ Instead of a monolithic router, we construct six dedicated graphs:
 * **Tasks**: Coded the capacity calculator (remaining effort divided by available slots). Implemented Time Spine checkpoint generation and normalization. Assembled the Command Canvas layout. Built the Active Focus Console, incorporating manual block creation, start, complete (with reflection), and skip flows. Ensured atomic state updates.
 * **Verification**: Verified using the automated pytest suite and manual testing on the local UI (Confirming risk recalculation logic and progress updates).
 
-### Phase 5: Google OAuth Integration & Dedicated Connections
-* **Files to create**: `/backend/app/api/v1/calendar.py`, `/backend/app/services/calendar_service.py`
-* **Tasks**: Code Google OAuth token exchange. Create the `google_connections` table. Hook up the backend sync service to pull calendar events.
-* **Verification**: Complete the OAuth flow and verify that access/refresh tokens are securely saved in `google_connections` and calendar events populate the UI.
+## Phase 4.5: Production Security Hardening (Completed)
+**Goal:** Ensure all OAuth tokens are securely stored and no plaintext secrets leak into application tables or APIs.
 
-### Phase 6: Multi-Mode LangGraph Orchestration & SSE Traces
+- [x] Use Supabase Vault (`supabase_vault` extension) for token storage.
+- [x] Remove plaintext `access_token` and `refresh_token` from `google_connections` table.
+- [x] Build `SECURITY DEFINER` RPCs (`set_google_tokens`, `get_decrypted_google_tokens`, `delete_google_connection`) constrained to `service_role`.
+- [x] Refactor backend `google_oauth_service.py` to route all token persistence and retrieval through these secure RPCs.
+- [x] Audit endpoints (`GET /api/v1/google/connection`) to guarantee no secrets leak to frontend.
+- [x] Verify tests pass without relying on plaintext tokens in Postgres.
+
+### Phase 5: Auto-Scheduling (LangGraph MVP)Orchestration & SSE Traces
 * **Files to create**: `/backend/app/agents/graph.py`, `/backend/app/api/v1/agent.py`
 * **Tasks**: Wire up individual LangGraph graphs. Implement SSE progress streaming inside the Agent Console UI.
 * **Verification**: Run an intake agent task and verify that the Agent Console displays live, server-sent trace steps in real time.
