@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Calendar, CheckCircle2, AlertCircle } from "lucide-react";
+import { apiFetch as fetch } from "../../lib/api";
 import type { GoogleConnectionStatus } from "../../types/api";
 
 export function CalendarConnection() {

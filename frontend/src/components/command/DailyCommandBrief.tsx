@@ -66,7 +66,7 @@ export function DailyCommandBrief({ brief }: DailyCommandBriefProps) {
             <InfoHint content="Your estimated usable work time after calendar events and existing focus blocks." />
           </p>
           <div className="flex items-center gap-2 mb-1">
-            <Clock className="w-6 h-6 text-blue-500" />
+            <Clock className="w-6 h-6 text-accent-amber" />
             <span className="text-xl font-bold text-text-primary">
               {brief.available_minutes_today} <span className="text-sm font-medium text-text-muted">mins</span>
             </span>
@@ -77,9 +77,10 @@ export function DailyCommandBrief({ brief }: DailyCommandBriefProps) {
         <div className="bg-white p-4 rounded-xl border border-warm-border">
           <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center">
             Pending Approvals
+            <InfoHint content="Suggested actions ChronOS prepared for you. They wait here until you approve or reject them." />
           </p>
           <div className="flex items-center gap-2 mb-1">
-            <CheckCircle2 className="w-6 h-6 text-purple-500" />
+            <CheckCircle2 className="w-6 h-6 text-accent-amber" />
             <span className="text-xl font-bold text-text-primary">
               {brief.schedule_proposal_count} <span className="text-sm font-medium text-text-muted">actions</span>
             </span>

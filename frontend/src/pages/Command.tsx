@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Play, Check, SkipForward, AlertCircle, Clock, CheckCircle2, Circle } from 'lucide-react';
-import { apiUrl } from '../lib/api';
+import { apiUrl, apiFetch as fetch } from '../lib/api';
 import AppShell from '../components/layout/AppShell';
 import ReflectionModal from '../components/command/ReflectionModal';
 import SkipModal from '../components/command/SkipModal';
@@ -216,9 +216,9 @@ export default function Command() {
 
   return (
     <AppShell>
-      {/* max-w-3xl for visual baseline with Settings.tsx */}
-      <div className="flex flex-col h-full overflow-y-auto pr-2 pb-12 max-w-3xl mx-auto">
-        <CommandHero onAnalyze={handleRunAnalysis} isAnalyzing={isAnalyzing} onLoadDemo={handleLoadDemo} />
+      {/* max-w-5xl for wider layout to fix text truncation */}
+      <div className="flex flex-col h-full overflow-y-auto pr-2 pb-12 max-w-5xl mx-auto">
+        <CommandHero onAnalyze={handleRunAnalysis} isAnalyzing={isAnalyzing} />
         
         {commitments.length === 0 && !loadingList ? (
           <EmptyState onLoadDemo={async () => {
@@ -232,7 +232,7 @@ export default function Command() {
             <DecisionDock key={dockKey} onRefresh={refreshAll} />
 
             {rescueCandidates.length > 0 && (
-              <div className="bg-red-50 border-l-4 border-l-risk-atrisk border-y border-r border-warm-border rounded-r-xl p-5 mb-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="bg-warm-cream border-l-4 border-l-accent-terracotta border-y border-r border-warm-border rounded-r-xl p-5 mb-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <h3 className="text-base font-bold text-text-primary mb-1 flex items-center gap-2">
                     <AlertCircle className="w-5 h-5 text-risk-atrisk" /> 
@@ -246,7 +246,7 @@ export default function Command() {
                 <button
                   onClick={() => handleRunRescue(rescueCandidates[0].id)}
                   disabled={runningRescue === rescueCandidates[0].id}
-                  className="px-4 py-2 bg-white border border-risk-atrisk text-risk-atrisk text-sm font-bold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
+                  className="px-4 py-2 bg-white border border-warm-border text-accent-copper text-sm font-semibold rounded-lg hover:bg-warm-ivory transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
                 >
                   {runningRescue === rescueCandidates[0].id ? 'Generating...' : 'Review rescue options'}
                 </button>
@@ -264,13 +264,13 @@ export default function Command() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Active Focus Console */}
-                  <div className="bg-warm-cream border border-warm-border rounded-xl p-6 shadow-sm flex flex-col">
+                  {/* Execution Workspace */}
+                  <div className="bg-white border border-warm-border rounded-xl p-6 shadow-sm flex flex-col">
                     <div className="flex justify-between items-start mb-6">
                       <div>
                         <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
                           <Play className="w-5 h-5 text-accent-amber" />
-                          Active Focus Console
+                          Execution Workspace
                         </h3>
                       </div>
                       <div className="text-right">
@@ -283,13 +283,13 @@ export default function Command() {
                     <div className="flex-1">
                       {detail.focus_blocks.filter(b => b.status === 'scheduled' || b.status === 'active').length === 0 ? (
                         <div className="text-center py-6 bg-white rounded-lg border border-warm-border">
-                          <p className="text-text-secondary mb-4 text-sm">No active focus block.</p>
+                          <p className="text-text-secondary mb-4 text-sm">No active focus block yet.</p>
                           <button 
                             onClick={handleCreateBlock}
                             disabled={creatingBlock}
                             className="px-4 py-2 bg-warm-ivory border border-warm-border text-text-primary text-sm font-semibold rounded-lg hover:bg-warm-border transition-colors shadow-sm"
                           >
-                            {creatingBlock ? 'Scheduling...' : 'Start Manual Focus Block'}
+                            {creatingBlock ? 'Scheduling...' : 'Create focus block'}
                           </button>
                         </div>
                       ) : (
@@ -338,7 +338,7 @@ export default function Command() {
                   </div>
 
                   {/* Time Spine */}
-                  <div className="bg-warm-cream border border-warm-border rounded-xl p-6 shadow-sm">
+                  <div className="bg-white border border-warm-border rounded-xl p-6 shadow-sm">
                     <h3 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-risk-stable" />
                       Time Spine
@@ -408,7 +408,7 @@ export default function Command() {
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-text-primary mb-4">Connections & Demo Tools</h3>
+                <h3 className="text-lg font-bold text-text-primary mb-4">Connections</h3>
                 <div className="space-y-4">
                   <CalendarConnection />
                   <DemoModeCard onLoadDemo={handleLoadDemo} />

@@ -1,5 +1,5 @@
-import { apiUrl } from '../../lib/api';
 import React, { useState } from 'react';
+import { apiUrl, apiFetch as fetch } from '../../lib/api';
 import type { CommitmentDraft, ApproveCommitmentsRequest } from '../../types/api';
 import { CommitmentDraftCard } from './CommitmentDraftCard';
 import { AgentConsole } from '../agent/AgentConsole';

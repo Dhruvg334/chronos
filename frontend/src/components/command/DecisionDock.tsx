@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, X, Zap, ChevronDown, ChevronUp } from 'lucide-react';
-import { apiUrl } from '../../lib/api';
+import { apiUrl, apiFetch as fetch } from '../../lib/api';
 import { InfoHint } from '../ui/InfoHint';
 
 interface Proposal {

@@ -1,5 +1,5 @@
-import { apiUrl } from '../../lib/api';
 import React, { useState, useEffect } from 'react';
+import { apiUrl, apiFetch as fetch } from '../../lib/api';
 import type { AgentTraceEvent } from '../../types/api';
 
 interface AgentConsoleProps {

@@ -1,177 +1,180 @@
-# ChronOS — Proactive AI Time Operating System
+# ChronOS — A secure AI Time Operating System for deadline recovery
 
-> **"Your time does not need another list. It needs an operating system."**
+Turn messy commitments into executable recovery paths with human-approved AI planning.
 
-ChronOS is an adaptive commitment execution system that converts messy life inputs into structured execution paths (Time Spines), maps work against calendar reality, detects planning deviations (Drift), and leverages agentic AI to replan or rescue commitments before deadlines fail.
+## Product overview
+ChronOS is an AI-powered time operating system that takes messy, unstructured brain dumps and extracts structured commitments. It checks real calendar capacity and risk levels to proactively predict deadline collapse. ChronOS agents then propose schedule and rescue actions (like focus blocks or scope reduction) which require explicit human approval before execution, allowing you to regain control of your time through a continuous reflection loop.
 
----
+## Problem statement
+People don't only forget tasks; they lose control when commitments, deadlines, limited energy, and strict calendar realities conflict. Traditional task managers wait for you to fail, while autonomous agents make risky decisions without context. ChronOS acts as a "last-minute life saver," predicting deadline collapse before it happens and offering safe, executable recovery paths.
 
-## 1. Product Philosophy & Thesis
+## Why ChronOS is different
+* **Not a reminder app**: ChronOS orchestrates multi-stage focus and execution paths.
+* **Not a chatbot**: ChronOS provides a structured, calm UI driven by deterministic capacity and risk rules.
+* **Not an autonomous assistant**: ChronOS acts *only* with explicit human permission.
+* **A Time Operating System**: It features planning, risk assessment, rescue generation, and human approval in one cohesive loop.
 
-Most productivity tools store tasks and send static notifications. ChronOS assumes real life is messy and plans rarely survive contact with reality. Users miss deadlines not because they forget, but because:
-1. They start too late and underestimate effort.
-2. Vague tasks act as procrastination traps.
-3. Their calendars are full of unrecognized blocks.
-4. They fail to renegotiate or cut scope until it is too late.
+## Feature list
+* **Brain Dump Intake**: Paste unstructured text to generate organized tasks.
+* **Commitment Clarifier**: AI clarifies ambiguous intent and sets structured deadlines.
+* **Time Health / Risk Engine**: Deterministic rules compare effort against calendar reality.
+* **Google Calendar Read-Only Capacity**: Syncs real-world busy blocks to accurately find free focus time.
+* **Schedule Proposal Agent**: LangGraph-based stateful agent proposing deep work blocks.
+* **Rescue Mode**: Intervenes on failing commitments with scope compression, deadline renegotiation, or urgent recovery blocks.
+* **Decision Dock**: A consolidated UI queue for human review of all AI proposals.
+* **Daily Command Brief**: At-a-glance dashboard of Time Health and next best actions.
+* **Reflection Loop**: Log actual effort after focus blocks to improve future risk modeling.
+* **Supabase Auth + Google Login**: Secure account management.
+* **Supabase Vault token security**: Google OAuth tokens are stored securely in Supabase Vault, inaccessible to the frontend.
+* **About / Guide documentation**: In-product explanations of agentic behaviors.
 
-ChronOS solves this by operationalizing **GTD**, **Implementation Intentions**, **Planning Fallacy corrections**, and **proactive rescue workflows** into a single cohesive interface.
+## Architecture
 
----
-
-## 2. System Architecture
-
-ChronOS is constructed as a monorepo consisting of:
-- **Frontend**: A React + TypeScript + Vite app styled with a premium warm light palette, featuring an interactive SVG Time Spine, Active Focus timer, real-time Agent Trace viewer, and a Decision Dock approval console.
-- **Backend**: A FastAPI server running Python-based business modules and six dedicated **LangGraph** agent graphs.
-- **Database**: A Supabase PostgreSQL database utilizing Row Level Security (RLS) and automated triggers for user onboarding and metadata updates.
-
-```text
-  ┌─────────────────────────────────────────────────────────────┐
-  │                        React Frontend                       │
-  │   (Command Canvas, Time Spine, Decision Dock, Agent Trace)   │
-  └──────────────────────────────┬──────────────────────────────┘
-                                 │
-                        HTTP REST / SSE / JWT
-                                 │
-                                 ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │                        FastAPI Server                       │
-  │     [API Routers] ───> [LangGraph Multi-Mode Graphs]        │
-  └──────────────┬───────────────────────────────┬──────────────┘
-                 │                               │
-             Postgres / RLS                  Gemini API / Calendar API
-                 │                               │
-                 ▼                               ▼
-  ┌──────────────────────────────┐ ┌────────────────────────────┐
-  │      Supabase Database       │ │      Google Services       │
-  │   (RLS Onboard & Triggers)   │ │  (AI Studio, OAuth, Cal)   │
-  └──────────────────────────────┘ └────────────────────────────┘
+```mermaid
+flowchart LR
+  User[User] --> FE[React + Vite Frontend]
+  FE --> Auth[Supabase Auth]
+  FE --> API[FastAPI Backend]
+  API --> Gemini[Gemini API]
+  API --> SG[LangGraph Scheduling Graph]
+  API --> RG[LangGraph Rescue Graph]
+  API --> DB[(Supabase Postgres + RLS)]
+  API --> Vault[Supabase Vault]
+  API --> GCal[Google Calendar Read-only API]
+  SG --> DB
+  RG --> DB
 ```
 
----
+## Agentic workflow
 
-## 3. Directory Structure
-
-```text
-chronos/
-├── docs/                      # Product specs and ADRs
-│   ├── chronos/
-│   │   ├── MASTER_CONTEXT.md
-│   │   ├── PROJECT_REQUIREMENTS.md
-│   │   ├── DESIGN_SPECIFICATIONS.md
-│   │   ├── ARCHITECTURE_DECISIONS.md # ADRs (auth, connections, agents)
-│   │   ├── BUILD_STATUS.md           # Live feature tracking checklist
-│   │   └── IMPLEMENTATION_PLAN.md    # Multi-phase implementation roadmap
-│   └── skills/
-│       └── SKILLS_RECOMMENDATIONS.md # Recommended tooling integrations
-├── supabase/                  # Supabase schema definitions and migration SQLs
-├── backend/                   # FastAPI + LangGraph server
-│   ├── app/
-│   │   ├── api/               # Router endpoints (auth, commitments, calendar, drift, agent)
-│   │   ├── core/              # Config, security, DB connections
-│   │   ├── schemas/           # Pydantic validation models
-│   │   ├── services/          # Calendar sync, risk algorithms, database helpers
-│   │   └── agents/            # LangGraph graph modules and LLM tools
-│   ├── tests/                 # Unit and integration test suite
-│   ├── requirements.txt       # Dependencies list
-│   └── .env.example           # Secrets template
-└── frontend/                  # React + TypeScript + Vite app
-    ├── src/
-    │   ├── components/        # Canvas widgets (TimeSpine, FocusConsole, AgentTrace)
-    │   ├── store/             # Zustand states (auth, canvas, agent runs)
-    │   └── pages/             # Layout sheets (Landing, Canvas, Inbox, Rescue)
-    └── package.json
+```mermaid
+flowchart TD
+  Dump[Brain Dump] --> Extract[Extraction]
+  Extract --> Review[Commitment Review]
+  Review --> Risk[Risk Scoring]
+  Risk --> Capacity[Calendar Capacity]
+  Capacity --> Sched[Schedule Proposals]
+  Capacity --> Resc[Rescue Proposals]
+  Sched --> Dock[Decision Dock]
+  Resc --> Dock
+  Dock --> Approve[User Approval]
+  Approve --> Focus[Focus Block / Reflection]
 ```
 
----
+## Safety model
+* **ChronOS proposes; user approves.**
+* No focus blocks are created without explicit user approval.
+* No external emails or messages are sent.
+* Calendar integration is strictly read-only.
+* OAuth tokens are stored server-side securely through Supabase Vault.
+* The frontend never receives Google OAuth tokens or backend secrets.
 
-## 4. Google Technologies Utilized
+## Google technologies
+* **Gemini API**: Used for structured intent extraction and plan explanation.
+* **Google Calendar**: Read-only API access for calculating focus capacity.
+* **Google OAuth**: For secure calendar connection via user authorization.
+* **Google Login**: Seamless authentication through Supabase OAuth provider.
 
-1. **Google AI Studio & Gemini API**: Powers structured extraction, task complexity classification, replanning calculations, rescue plans, and communication scripts.
-2. **Google Calendar API**: Pulls events, calculates active capacity slots, and creates/reschedules focus blocks.
-3. **Google Cloud Run**: Hosts the FastAPI backend container for production.
+## Tech stack
 
----
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React, TypeScript, Vite, Tailwind |
+| **Backend** | FastAPI, Python, Pydantic |
+| **AI / Agent** | Gemini, LangGraph |
+| **Database/Auth** | Supabase Postgres, RLS, Supabase Auth, Supabase Vault |
+| **Integrations** | Google Calendar API, Google OAuth |
+| **Testing** | Pytest, Vite build / TypeScript |
 
-## 5. Setup & Local Development
+## Local setup instructions
 
-### 5.1 Supabase Setup
-1. Create a Supabase project.
-2. Run the SQL files in `supabase/migrations/` in chronological order to initialize tables, constraints, RLS policies, and triggers.
-
-### 5.2 Backend Installation
-1. Navigate to the backend directory:
+1. **Clone repo**: `git clone <repo_url> && cd chronos`
+2. **Backend env vars**: Create `backend/.env` based on `backend/.env.example`. Do NOT commit this file.
+3. **Frontend env vars**: Create `frontend/.env` based on `frontend/.env.example`. Do NOT commit this file.
+4. **Supabase local start**: `supabase start --ignore-health-check` (Required due to local Logflare health quirks).
+5. **Supabase db reset**: `supabase db reset` to apply schemas and seed Vault RPCs.
+6. **Backend install/run**: 
    ```bash
    cd backend
+   python -m venv venv
+   source venv/bin/activate  # or venv\Scripts\activate on Windows
+   pip install -r requirements.txt
+   uvicorn app.main:app --reload
    ```
-2. Create a virtual environment and install dependencies:
-## Status: Phase 2 Completed
-- **Phase 1**: Database setup (Supabase migrations, RLS, triggers).
-- **Phase 2**: AI Intake Loop, Brain Dump Extraction with Gemini, Risk Scoring, and Command Canvas initialization.
+7. **Frontend install/run**:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+8. **Tests/Build commands**:
+   ```bash
+   # Backend
+   cd backend && python -m pytest
+   # Frontend
+   cd frontend && npm run build
+   ```
 
-### Phase 2 Local Runbook
+## Environment variables
 
-**1. Database Configuration**
-```bash
-# Start local Supabase (ignores known analytics container issue)
-npx supabase start --ignore-health-check
-```
-*Run `npx supabase status` and copy `API URL`, `anon key`, and `service_role key`.*
+### Backend
+* `SUPABASE_URL`
+* `SUPABASE_ANON_KEY`
+* `SUPABASE_SERVICE_ROLE_KEY`
+* `DEV_USER_ID` (Optional fallback for local bypass)
+* `GEMINI_API_KEY`
+* `GOOGLE_CLIENT_ID`
+* `GOOGLE_CLIENT_SECRET`
+* `GOOGLE_REDIRECT_URI`
+* `GOOGLE_SCOPES`
+* `FRONTEND_URL`
 
-**2. Environment Configuration**
-* Copy `.env.example` to `.env` in the root folder.
-* Copy `backend/.env.example` to `backend/.env`.
-* Fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (backend only), and `GEMINI_API_KEY` (backend only).
-* Set `DEV_USER_ID` in `backend/.env` using a UUID from `docs/chronos/DB_VERIFICATION.md` for Dev Auth bypass.
+### Frontend
+* `VITE_API_URL`
+* `VITE_SUPABASE_URL`
+* `VITE_SUPABASE_ANON_KEY`
 
-**3. Start Backend & Tests**
-```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate # Windows
-pip install -r requirements.txt
-python -m pytest
-python -m uvicorn app.main:app --reload
-```
+> **WARNING**: Never commit `.env`, `backend/.env`, or `frontend/.env`.
 
-**4. Start Frontend**
-```bash
-# Open a new terminal
-cd frontend
-npm install
-npm run build
-npm run dev
-```
+## Auth setup notes
+To use authentication locally or in production, configure your Supabase Dashboard:
+* Enable **Email/Password** Auth.
+* Enable **Confirm email** (Email Verification).
+* Configure the **Google Provider** in Authentication -> Providers.
+* Configure **Redirect URLs** (e.g., `http://localhost:5173/auth/callback` or production equivalent).
+* Ensure the frontend uses the correct callback route to exchange OAuth hashes.
 
-**5. Manual Test Flow**
-1. Open `http://localhost:5173/inbox`.
-2. Click the "Hackathon Week" quick prompt and submit.
-3. Review the AI-extracted commitment drafts and observe the trace logs in the Agent Console.
-4. Approve the commitments.
-5. Navigate to `http://localhost:5173/command` to view your saved commitments, risk levels, and basic time spines.
+## Demo flow
+1. Sign up or log in.
+2. Open Command dashboard.
+3. Scroll down and click **Load Judge Demo** from Connections & Demo Tools.
+4. Click **Run ChronOS Analysis**.
+5. Review the updated **Daily Command Brief** and Time Health.
+6. Expand **Pending Approvals** to view proposed actions securely grouped by commitment.
+7. Approve/reject a proposed action.
+8. Review the Rescue, Focus, and Reflection flow in the Active Focus Console.
 
----
+## Screenshots
 
-## 6. Signature Demo Scenarios
+> Add screenshots before final submission:
+> - Landing
+> - Command Brief
+> - Decision Dock
+> - Inbox
+> - About/Guide
 
-ChronOS provides four first-class interactive scenarios to demonstrate its capabilities:
+## Roadmap
+* **Phase 7B**: Sprint Mode + First 15 Minutes + Starter Asset Generator
+* **Phase 7D**: Drift/Avoidance Detector + Adaptive Replan
+* **Phase 7E**: Final polish + deployment + submission packaging
+* **Optional**: Gmail read-only commitment extraction
 
-### Scenario A: Hackathon Week (The Core Loop Demo)
-1. **Intake**: Paste a messy paragraph: *"Need to build the landing page by Friday, write API tests by Wednesday, and present the demo on Saturday. I also have classes from 10 AM to 2 PM daily."*
-2. **Spine Creation**: Gemini extracts these tasks, maps milestone checkpoints, and builds the SVG Time Spine, overlaying daily class schedules.
-3. **Drift**: Log a drift event: *"Frontend landing design took 2 hours longer than planned."*
-4. **Replan**: The Replanner agent detects a meeting collision. It shifts low-priority tasks, creates a focus block suggestion in the Decision Dock, and streams server-side trace details in the Agent Console.
-5. **Approval**: Clicking "Approve" moves the calendar events.
+## Limitations
+* Calendar integration is read-only.
+* No autonomous calendar write-back.
+* No external email sending capabilities.
+* Mobile polish may need more targeted media queries.
+* Gmail extraction is deferred to a future phase.
 
-### Scenario B: Assignment Crisis (Rescue Mode Demo)
-1. **Critical Drift**: Log: *"I haven't started my university project, and it is due in 6 hours."*
-2. **Rescue Trigger**: The Risk Engine flags the commitment status as `Rescue Required` (load ratio > 100%).
-3. **MVCP Output**: The screen shifts to a Rescue border. ChronOS provides a Minimum Viable Completion Path: strips non-essential research steps, locks a 3-hour deep work block, and disables distracting tabs.
-4. **Negotiation**: The Negotiator agent drafts a polite extension request template.
-
-### Scenario C: Interview Prep Week (Long-Horizon Planning)
-1. **Milestones**: A 2-week prep timeline is segmented into milestones (Algorithms study, System Design mock, Resume review).
-2. **Feedback Gates**: Inserts review checkpoints (e.g. feedback from resume review) 3 days before submission.
-
-### Scenario D: Busy Professional Day (Context-Aware Shielding)
-1. **Deep Work Protection**: Auto-reschedules focus blocks around urgent client calls while maintaining task deadlines.
+## Contribution status
+Built for a hackathon submission, but strictly structured as a real product foundation with enterprise-grade security and RLS data isolation.
