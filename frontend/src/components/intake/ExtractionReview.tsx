@@ -1,3 +1,4 @@
+import { apiUrl } from '../../lib/api';
 import React, { useState } from 'react';
 import type { CommitmentDraft, ApproveCommitmentsRequest } from '../../types/api';
 import { CommitmentDraftCard } from './CommitmentDraftCard';
@@ -38,7 +39,7 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({ agentRunId, 
         approved_drafts: drafts
       };
 
-      const response = await fetch("http://localhost:8000/api/v1/ai/intake/approve", {
+      const response = await fetch(apiUrl('/api/v1/ai/intake/approve'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

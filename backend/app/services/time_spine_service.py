@@ -1,21 +1,22 @@
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime, timezone
-from app.core.database import supabase_client
 import logging
+
+from postgrest.exceptions import APIError
+
+from app.core.database import supabase_client
 
 logger = logging.getLogger(__name__)
 
+
 def normalize_spine_json(spine_json: List[Dict[str, Any]], current_stage: str, risk_level: str) -> List[Dict[str, Any]]:
-    """
-    Normalizes the raw spine_json into a frontend-friendly shape.
-    """
+    """Normalize raw spine JSON into a frontend-friendly shape."""
     normalized = []
     found_current = False
-    
-    for i, stage in enumerate(spine_json):
-        stage_id = stage.get("id")
-        
-        # Determine status relative to current_stage
+
+    for i, stage in enumerate(spine_json or []):
+        stage_id = stage.get("id") or stage.get("key") or f"stage_{i}"
+
         status = stage.get("status", "pending")
         if status == "pending" and not found_current:
             if stage_id == current_stage:
@@ -28,7 +29,7 @@ def normalize_spine_json(spine_json: List[Dict[str, Any]], current_stage: str, r
         elif stage_id == current_stage:
             status = "active"
             found_current = True
-            
+
         normalized.append({
             "key": stage_id,
             "label": stage.get("label", stage_id),
@@ -36,73 +37,112 @@ def normalize_spine_json(spine_json: List[Dict[str, Any]], current_stage: str, r
             "status": status,
             "timestamp": stage.get("timestamp"),
             "risk_level": risk_level if status == "active" else None,
-            "explanation": stage.get("explanation")
+            "explanation": stage.get("explanation"),
         })
     return normalized
 
 
+def _empty_time_spine_view() -> Dict[str, Any]:
+    return {"stages": [], "current_stage": None}
+
+
 def get_time_spine_view(commitment_id: str, user_id: str) -> Dict[str, Any]:
     """
-    Fetches the time spine and commitment risk, returning a normalized view.
+    Fetch and normalize a commitment time spine.
+
+    This helper is intentionally defensive. Some Phase 3 endpoints should still
+    complete if a spine is missing, malformed, or if mocked tests provide a
+    non-UUID placeholder commitment id. In those cases, return an empty spine
+    view instead of crashing the focus/reflection lifecycle.
     """
     if not supabase_client:
-        return {"stages": [], "current_stage": None}
+        return _empty_time_spine_view()
 
-    # Fetch time spine
-    spine_res = supabase_client.table("time_spines").select("*").eq("commitment_id", commitment_id).eq("user_id", user_id).single().execute()
+    try:
+        spine_res = (
+            supabase_client.table("time_spines")
+            .select("*")
+            .eq("commitment_id", commitment_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+    except APIError as exc:
+        logger.warning("Unable to fetch time spine for commitment %s: %s", commitment_id, exc)
+        return _empty_time_spine_view()
+
     if not spine_res.data:
-        return {"stages": [], "current_stage": None}
+        return _empty_time_spine_view()
 
-    # Fetch commitment risk level
-    comm_res = supabase_client.table("commitments").select("risk_level").eq("id", commitment_id).single().execute()
-    risk_level = comm_res.data.get("risk_level") if comm_res.data else "stable"
+    try:
+        comm_res = (
+            supabase_client.table("commitments")
+            .select("risk_level")
+            .eq("id", commitment_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+        risk_level = comm_res.data.get("risk_level") if comm_res.data else "stable"
+    except APIError as exc:
+        logger.warning("Unable to fetch risk level for commitment %s: %s", commitment_id, exc)
+        risk_level = "stable"
 
-    spine_json = spine_res.data.get("spine_json", [])
+    spine_json = spine_res.data.get("spine_json") or []
     current_stage = spine_res.data.get("current_stage")
 
-    normalized = normalize_spine_json(spine_json, current_stage, risk_level)
-    
     return {
-        "stages": normalized,
-        "current_stage": current_stage
+        "stages": normalize_spine_json(spine_json, current_stage, risk_level),
+        "current_stage": current_stage,
     }
 
 
 def advance_time_spine_stage(commitment_id: str, user_id: str, event_type: str = "progress") -> None:
-    """
-    Advances the current_stage based on events like progress or reflection.
-    """
+    """Advance the current stage when possible; never break the parent operation."""
     if not supabase_client:
         return
-        
-    spine_res = supabase_client.table("time_spines").select("*").eq("commitment_id", commitment_id).eq("user_id", user_id).single().execute()
+
+    try:
+        spine_res = (
+            supabase_client.table("time_spines")
+            .select("*")
+            .eq("commitment_id", commitment_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+    except APIError as exc:
+        logger.warning("Unable to advance time spine for commitment %s: %s", commitment_id, exc)
+        return
+
     if not spine_res.data:
         return
-        
+
     spine = spine_res.data
-    spine_json = spine.get("spine_json", [])
+    spine_json = spine.get("spine_json") or []
     current_stage = spine.get("current_stage")
-    
-    # Simple progression logic: just find current_stage and move to the next if it exists
+
     next_stage = current_stage
     found = False
-    
+
     for i, stage in enumerate(spine_json):
-        if stage.get("id") == current_stage:
+        if stage.get("id") == current_stage or stage.get("key") == current_stage:
             found = True
-            # Check if there is a next stage
             if i + 1 < len(spine_json):
-                next_stage = spine_json[i+1].get("id")
-                
-                # Mark current stage as completed with a timestamp
+                next_stage = spine_json[i + 1].get("id") or spine_json[i + 1].get("key")
                 stage["status"] = "completed"
                 stage["timestamp"] = datetime.now(timezone.utc).isoformat()
             break
-            
+
     if found and next_stage != current_stage:
-        supabase_client.table("time_spines").update({
-            "current_stage": next_stage,
-            "spine_json": spine_json
-        }).eq("id", spine["id"]).execute()
-        
-        logger.info(f"Advanced time spine for commitment {commitment_id} to stage {next_stage}")
+        try:
+            (
+                supabase_client.table("time_spines")
+                .update({"current_stage": next_stage, "spine_json": spine_json})
+                .eq("id", spine["id"])
+                .eq("user_id", user_id)
+                .execute()
+            )
+            logger.info("Advanced time spine for commitment %s to stage %s", commitment_id, next_stage)
+        except APIError as exc:
+            logger.warning("Failed to persist time spine advance for commitment %s: %s", commitment_id, exc)

@@ -1,3 +1,4 @@
+import { apiUrl } from '../../lib/api';
 import React, { useState, useEffect } from 'react';
 import type { AgentTraceEvent } from '../../types/api';
 
@@ -15,7 +16,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ agentRunId }) => {
 
     const pollTraces = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/agent/runs/${agentRunId}/trace`);
+        const response = await fetch(apiUrl(`/api/v1/agent/runs/${agentRunId}/trace`));
         if (response.ok) {
           const data = await response.json();
           if (!cancelled) setTraces(Array.isArray(data.events) ? data.events : []);

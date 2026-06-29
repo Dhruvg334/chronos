@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Play, Check, SkipForward, AlertCircle, Clock, CheckCircle2, Circle
 } from 'lucide-react';
+import { apiUrl } from '../lib/api';
 import AppShell from '../components/layout/AppShell';
 import ReflectionModal from '../components/command/ReflectionModal';
 import SkipModal from '../components/command/SkipModal';
@@ -24,7 +25,7 @@ export default function Command() {
 
   const fetchCommitments = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/commitments');
+      const res = await fetch(apiUrl('/api/v1/commitments'));
       if (!res.ok) throw new Error('Failed to load commitments');
       const data = await res.json();
       setCommitments(data);
@@ -41,7 +42,7 @@ export default function Command() {
   const fetchDetail = async (id: string) => {
     setLoadingDetail(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/commitments/${id}`);
+      const res = await fetch(apiUrl(`/api/v1/commitments/${id}`));
       if (!res.ok) throw new Error('Failed to load commitment detail');
       const data = await res.json();
       setDetail(data);
@@ -68,7 +69,7 @@ export default function Command() {
     const startAt = new Date();
     const endAt = new Date(startAt.getTime() + 60 * 60 * 1000); // 1 hour default
     try {
-      const res = await fetch('http://localhost:8000/api/v1/focus-blocks', {
+      const res = await fetch(apiUrl('/api/v1/focus-blocks'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,7 +92,7 @@ export default function Command() {
 
   const handleStartBlock = async (blockId: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/focus-blocks/${blockId}/start`, { method: 'POST' });
+      const res = await fetch(apiUrl(`/api/v1/focus-blocks/${blockId}/start`), { method: 'POST' });
       if (res.ok && detail) {
         fetchDetail(detail.id);
       }
@@ -103,7 +104,7 @@ export default function Command() {
   const handleCompleteBlock = async (data: any) => {
     if (!reflectionBlockId || !detail) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/focus-blocks/${reflectionBlockId}/complete`, {
+      const res = await fetch(apiUrl(`/api/v1/focus-blocks/${reflectionBlockId}/complete`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -121,7 +122,7 @@ export default function Command() {
   const handleSkipBlock = async (data: any) => {
     if (!skipBlockId || !detail) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/focus-blocks/${skipBlockId}/skip`, {
+      const res = await fetch(apiUrl(`/api/v1/focus-blocks/${skipBlockId}/skip`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)

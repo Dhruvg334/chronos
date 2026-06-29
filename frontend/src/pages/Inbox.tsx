@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiUrl } from '../lib/api';
 import AppShell from '../components/layout/AppShell';
 import { ExtractionReview } from '../components/intake/ExtractionReview';
 import type { IntakeResponse } from '../types/api';
@@ -21,7 +22,7 @@ export default function Inbox() {
     setIsProcessing(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:8000/api/v1/ai/intake", {
+      const response = await fetch(apiUrl('/api/v1/ai/intake'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
