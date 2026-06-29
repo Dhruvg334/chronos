@@ -7,6 +7,7 @@ import AppShell from '../components/layout/AppShell';
 import ReflectionModal from '../components/command/ReflectionModal';
 import SkipModal from '../components/command/SkipModal';
 import { CalendarConnection } from '../components/command/CalendarConnection';
+import DecisionDock from '../components/command/DecisionDock';
 import type { SavedCommitment, CommitmentDetailResponse, NormalizedTimeSpineStage, CapacityAvailability } from '../types/api';
 
 export default function Command() {
@@ -24,6 +25,28 @@ export default function Command() {
   
   // Create focus block state
   const [creatingBlock, setCreatingBlock] = useState(false);
+  
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [dockKey, setDockKey] = useState(0);
+
+  const refreshAll = async () => {
+    await fetchCommitments();
+    await fetchCapacity();
+    if (selectedId) await fetchDetail(selectedId);
+    setDockKey(prev => prev + 1);
+  };
+
+  const handleGeneratePlan = async () => {
+    setGeneratingPlan(true);
+    try {
+      await fetch(apiUrl('/api/v1/scheduling/plan'), { method: 'POST' });
+      setDockKey(prev => prev + 1);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
 
   const fetchCommitments = async () => {
     try {
@@ -126,8 +149,7 @@ export default function Command() {
       });
       if (res.ok) {
         setReflectionBlockId(null);
-        await fetchDetail(detail.id);
-        await fetchCommitments();
+        await refreshAll();
       }
     } catch (err) {
       console.error(err);
@@ -144,8 +166,7 @@ export default function Command() {
       });
       if (res.ok) {
         setSkipBlockId(null);
-        await fetchDetail(detail.id);
-        await fetchCommitments();
+        await refreshAll();
       }
     } catch (err) {
       console.error(err);
@@ -184,7 +205,16 @@ export default function Command() {
           )}
 
           <div>
-            <h2 className="text-2xl font-extrabold text-[#2C2B29] mb-1">Commitments</h2>
+            <div className="flex justify-between items-center mb-1">
+              <h2 className="text-2xl font-extrabold text-[#2C2B29]">Commitments</h2>
+              <button
+                onClick={handleGeneratePlan}
+                disabled={generatingPlan}
+                className="px-3 py-1.5 bg-[#2C2B29] text-white text-xs font-bold rounded-lg hover:bg-black transition-colors shadow-sm disabled:opacity-50"
+              >
+                {generatingPlan ? 'Planning...' : 'Generate Plan'}
+              </button>
+            </div>
             <p className="text-[#7A7771] text-sm">Select a commitment to open its canvas.</p>
           </div>
           {loadingList ? (
@@ -399,6 +429,9 @@ export default function Command() {
                   </div>
                 )}
               </div>
+
+              {/* Decision Dock */}
+              <DecisionDock key={dockKey} onRefresh={refreshAll} />
             </div>
           )}
         </div>

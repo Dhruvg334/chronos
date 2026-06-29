@@ -11,8 +11,8 @@ This document tracks the live implementation status of ChronOS core modules, dat
 - [x] **Phase 3**: Active Focus Console, reflection loops, dynamic risk engines.
 - [x] **Phase 4**: Real-time mock APIs mapped to Google Calendar & Free/Busy Sync.
 - [x] **Phase 4.5**: Production Security Hardening (Supabase Vault for OAuth tokens).
-- [ ] **Phase 5**: Agentic Auto-Scheduling (LangGraph) & Eventual Rescheduling loops.
-- [ ] **Phase 6**: Rescue Mode & Chaos handling.Started
+- [x] **Phase 5**: Agentic Auto-Scheduling (LangGraph) & Eventual Rescheduling loops.
+- [ ] **Phase 6**: Rescue Mode & Chaos handling.
 
 ---
 

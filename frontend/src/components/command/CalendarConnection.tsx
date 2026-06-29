@@ -1,10 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
 import { Loader2, Calendar, CheckCircle2, AlertCircle } from "lucide-react";
-import { GoogleConnectionStatus } from "@/types/api";
-import { fetchAuthSession } from "@/lib/api"; // Wait, how do I make authenticated calls? We use fetch with headers.
-// Actually, let's just use standard fetch since the frontend doesn't have an axios instance exposed in api.ts
+import type { GoogleConnectionStatus } from "../../types/api";
 
 export function CalendarConnection() {
   const [status, setStatus] = useState<GoogleConnectionStatus | null>(null);
@@ -92,25 +88,25 @@ export function CalendarConnection() {
 
   if (loading) {
     return (
-      <Card className="mb-6">
-        <CardContent className="flex items-center justify-center py-6">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <div className="mb-6 bg-white border border-[#E5E0D8] rounded-xl shadow-sm">
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="h-6 w-6 animate-spin text-[#7A7771]" />
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-3 border-b">
-        <CardTitle className="text-lg flex items-center gap-2">
+    <div className="mb-6 bg-white border border-[#E5E0D8] rounded-xl shadow-sm">
+      <div className="pb-3 border-b border-[#E5E0D8] p-4">
+        <h3 className="text-lg font-bold text-[#2C2B29] flex items-center gap-2">
           <Calendar className="h-5 w-5" />
           Google Calendar
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-4">
+        </h3>
+      </div>
+      <div className="p-4 pt-4">
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md flex items-start gap-2 text-red-400 text-sm">
+          <div className="mb-4 p-3 bg-[#FFF5F5] border border-[#993333] rounded-md flex items-start gap-2 text-[#993333] text-sm">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <p>{error}</p>
           </div>
@@ -118,39 +114,50 @@ export function CalendarConnection() {
 
         {status?.connected ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-green-500 text-sm font-medium">
+            <div className="flex items-center gap-2 text-[#3D663D] text-sm font-medium">
               <CheckCircle2 className="h-4 w-4" />
               Connected
             </div>
             {status.email && (
-              <p className="text-xs text-muted-foreground">Account: {status.email}</p>
+              <p className="text-xs text-[#7A7771]">Account: {status.email}</p>
             )}
             {status.last_synced_at && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[#7A7771]">
                 Last synced: {new Date(status.last_synced_at).toLocaleString()}
               </p>
             )}
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing}>
-                {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <button 
+                onClick={handleSync} 
+                disabled={syncing}
+                className="px-3 py-1.5 border border-[#D1CCC2] text-[#4A4844] text-sm font-semibold rounded hover:bg-[#FAF9F6] transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {syncing && <Loader2 className="h-4 w-4 animate-spin" />}
                 Sync Now
-              </Button>
-              <Button size="sm" variant="destructive" onClick={handleDisconnect} disabled={syncing}>
+              </button>
+              <button 
+                onClick={handleDisconnect} 
+                disabled={syncing}
+                className="px-3 py-1.5 bg-transparent border border-[#993333] text-[#993333] text-sm font-semibold rounded hover:bg-[#FFF5F5] transition-colors disabled:opacity-50"
+              >
                 Disconnect
-              </Button>
+              </button>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#7A7771]">
               Connect your Google Calendar to view real-time availability and improve focus suggestions.
             </p>
-            <Button onClick={handleConnect} className="w-full">
+            <button 
+              onClick={handleConnect} 
+              className="w-full px-4 py-2 bg-[#2C2B29] text-white text-sm font-semibold rounded-lg hover:bg-black transition-colors"
+            >
               Connect Google Calendar
-            </Button>
+            </button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

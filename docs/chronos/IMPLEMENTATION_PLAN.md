@@ -161,10 +161,18 @@ Instead of a monolithic router, we construct six dedicated graphs:
 - [x] Audit endpoints (`GET /api/v1/google/connection`) to guarantee no secrets leak to frontend.
 - [x] Verify tests pass without relying on plaintext tokens in Postgres.
 
-### Phase 5: Auto-Scheduling (LangGraph MVP)Orchestration & SSE Traces
-* **Files to create**: `/backend/app/agents/graph.py`, `/backend/app/api/v1/agent.py`
-* **Tasks**: Wire up individual LangGraph graphs. Implement SSE progress streaming inside the Agent Console UI.
-* **Verification**: Run an intake agent task and verify that the Agent Console displays live, server-sent trace steps in real time.
+## Phase 5: Auto-Scheduling (LangGraph MVP) (Completed)
+**Goal:** Implement a human-in-the-loop proactive scheduling engine using LangGraph without automatically creating Calendar events.
+
+- [x] Added `create_focus_block` to `proposed_action_type` enum via migration `018`.
+- [x] Created `scheduling_service.py` to deterministically rank commitments and generate candidate blocks based on available capacity (mock or Google Calendar free/busy).
+- [x] Created `scheduling_graph.py` to structure the contextual loading, planning, validation, and persistence of proposed actions into the `agent_proposed_actions` table.
+- [x] Created `/api/v1/scheduling` routes to plan, list proposals, and approve/reject them with runtime validation against existing focus blocks and external calendar busy windows.
+- [x] Added `DecisionDock` component to the `Command` Canvas to display pending proposals with visual confidence matches.
+- [x] Added "Generate Schedule Plan" button to Command Canvas.
+- [x] Implemented robust error handling, skipping overlapping proposals during bulk approvals.
+- [x] Kept `langgraph==0.0.60` pinned to maintain compatibility.
+- [x] Preserved all Phase 4.5 Security bounds: No Google Calendar events created, no tokens exposed.
 
 ### Phase 7: Drift Radar & Replanning Agent
 * **Files to create**: `/backend/app/api/v1/drift.py`, `/frontend/src/components/canvas/DecisionDock.tsx`

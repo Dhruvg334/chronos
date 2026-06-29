@@ -18,6 +18,11 @@ Configured via `.env` to avoid hardcoding models.
 - **Implementation**: Access to Vault is wrapped in `SECURITY DEFINER` RPC functions (`public.set_google_tokens`, `public.get_decrypted_google_tokens`).
 - **Security Constraint**: These RPC functions have their execute permissions revoked from `public` and `authenticated`, and granted EXCLUSIVELY to `service_role`. The backend FastApi uses the Service Role key to fetch tokens securely in-memory. Tokens are strictly passed transiently to Google APIs and never logged or exposed in API JSON payloads.
 
+### AD-008: LangGraph MVP and Human-In-The-Loop Scheduling
+- **Context**: The Agent needs to propose schedule actions securely without hallucinating time slots or destructively overwriting external Google Calendars.
+- **Decision**: LangGraph MVP (`scheduling_graph.py`) orchestrates deterministic generation of candidate focus blocks based on remaining effort, risk score, and valid capacity windows (from `capacity_service.py`).
+- **Implementation**: Proposals are saved to `agent_proposed_actions`. A `DecisionDock` in the frontend surfaces these proposals. Only when the user hits "Approve" is the time slot validated against overlapping constraints again before being persisted as an internal ChronOS `focus_block`. External Google Calendar write-back is explicitly deferred.
+
 ## 3. Deterministic Risk Initialization
 Risk is not AI-generated; it is deterministically calculated using an explicit equation taking into account effort remaining, time until deadline, importance, flexibility, and confidence.
 `risk_score = clamp(raw_score * uncertainty_factor, 0, 100)`
