@@ -73,3 +73,34 @@ def test_risk_capacity_escalation():
         flexibility=3
     )
     assert any("capacity" in w for w in warnings)
+
+from app.services.risk_service import recalculate_commitment_risk, apply_skip_penalty, apply_overrun_penalty
+
+def test_apply_skip_penalty():
+    score, level = apply_skip_penalty(20.0) # stable
+    assert score == 35.0
+    assert level == "watch"
+
+def test_apply_overrun_penalty():
+    score, level = apply_overrun_penalty(20.0, 30) # 30 mins over = 5.0 penalty
+    assert score == 25.0
+    assert level == "watch"
+
+def test_recalculate_commitment_risk():
+    current_time = datetime.now(timezone.utc)
+    commitment = {
+        "estimated_minutes": 60,
+        "actual_minutes": 90, # 30 mins overrun
+        "progress_percent": 50.0,
+        "deadline_at": (current_time + timedelta(hours=2)).isoformat(),
+        "importance": 3,
+        "flexibility": 3,
+        "confidence_score": 1.0
+    }
+    
+    score, level = recalculate_commitment_risk(commitment, current_time)
+    
+    # Overrun penalty should be applied
+    # 30 mins over => 5.0 points.
+    assert score > 0
+    assert level in ["watch", "at_risk", "critical", "rescue_required"]

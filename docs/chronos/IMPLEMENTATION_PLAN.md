@@ -146,15 +146,10 @@ Instead of a monolithic router, we construct six dedicated graphs:
 * **Tasks**: Implemented Brain Dump extraction using Gemini + Pydantic schema validation with a 1-retry repair loop. Built the Inbox UI page displaying parsed drafts. Implemented mock capacity calculation and deterministic risk scoring. Created the `/command` view.
 * **Verification**: Verified using the automated pytest suite and manual testing on the local UI.
 
-### Phase 3: Risk Modeling & Time Spine Engine
-* **Files to create**: `/backend/app/services/risk_service.py`, `/frontend/src/components/canvas/TimeSpinePanel.tsx`
-* **Tasks**: Code the capacity calculator (remaining effort divided by available slots). Implement Time Spine checkpoint generation. Build the interactive SVG timeline.
-* **Verification**: Test the risk scoring function with mock calendar inputs and confirm it accurately triggers Stable, Watch, and Critical status thresholds.
-
-### Phase 4: Command Canvas & Focus Console (Mock Calendar Capacity)
-* **Files to create**: `/frontend/src/pages/CommandCanvas.tsx`, `/frontend/src/components/canvas/ActiveFocusConsole.tsx`
-* **Tasks**: Assemble the layout. Connect the Active Focus Console, incorporating task timers and done conditions.
-* **Verification**: Verify that starting a focus block triggers the countdown timer, and that completing it displays the reflection modal.
+### [COMPLETED] Phase 3: Risk Modeling, Time Spine Engine, and Active Focus Console
+* **Files created**: `/backend/app/services/risk_service.py`, `/backend/app/services/time_spine_service.py`, `/backend/app/api/v1/focus_blocks.py`, `/backend/app/api/v1/reflection.py`, `/frontend/src/pages/Command.tsx`
+* **Tasks**: Coded the capacity calculator (remaining effort divided by available slots). Implemented Time Spine checkpoint generation and normalization. Assembled the Command Canvas layout. Built the Active Focus Console, incorporating manual block creation, start, complete (with reflection), and skip flows. Ensured atomic state updates.
+* **Verification**: Verified using the automated pytest suite and manual testing on the local UI (Confirming risk recalculation logic and progress updates).
 
 ### Phase 5: Google OAuth Integration & Dedicated Connections
 * **Files to create**: `/backend/app/api/v1/calendar.py`, `/backend/app/services/calendar_service.py`

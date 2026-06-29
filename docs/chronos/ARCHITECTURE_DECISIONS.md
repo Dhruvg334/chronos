@@ -21,3 +21,9 @@ Uses a lightweight dependency mock relying on `DEV_USER_ID` environment variable
 ## 6. Technical Debt
 - **google.generativeai**: Currently using the legacy `google.generativeai` package instead of the newer `google-genai` SDK. This is a known technical debt item to be migrated in a future phase.
 - **Trace Polling**: Agent trace polling currently uses simple HTTP `setInterval` instead of an active Server-Sent Events (SSE) stream.
+
+## 7. Focus Block & Reflection Atomicity
+When completing a focus block via `POST /api/v1/focus-blocks/{id}/complete`, the backend requires a reflection payload to update the block, insert the reflection, recalculate risk, advance the time spine, and update commitment progress all in a single transaction-like API flow to prevent state mismatches.
+
+## 8. Time Spine Normalization
+The `spine_json` array stored in the database only holds static label/id data. The backend `time_spine_service` dynamically normalizes this data based on the `current_stage` pointer to return actionable statuses (`active`, `pending`, `completed`) rather than duplicating stateful values inside the JSON array.

@@ -46,6 +46,8 @@ app.include_router(drift.router, prefix="/api/v1/drift", tags=["drift"])
 app.include_router(rescue.router, prefix="/api/v1/rescue", tags=["rescue"])
 app.include_router(reflection.router, prefix="/api/v1/reflection", tags=["reflection"])
 app.include_router(agent.router, prefix="/api/v1/agent", tags=["agent"])
+from app.api.v1.focus_blocks import router as fb_router
+app.include_router(fb_router, prefix="/api/v1/focus-blocks", tags=["focus_blocks"])
 app.include_router(intake.router)
 
 if __name__ == "__main__":

@@ -101,3 +101,52 @@ export interface SavedCommitment {
   updated_at?: string;
   time_spines?: TimeSpine[];
 }
+
+export interface TaskSchema {
+  id: string;
+  title: string;
+  status: string;
+  estimated_minutes: number;
+  actual_minutes: number;
+  sequence_order: number;
+  next_action?: string | null;
+  done_condition?: string | null;
+}
+
+export interface FocusBlockSchema {
+  id: string;
+  title: string;
+  start_at: string;
+  end_at: string;
+  block_type: string;
+  status: string;
+}
+
+export interface ReflectionSchema {
+  id: string;
+  planned_minutes: number;
+  actual_minutes: number;
+  completion_status: string;
+  energy_level: number;
+  blocker_reason?: string | null;
+  quality_confidence?: string | null;
+  notes?: string | null;
+}
+
+export interface NormalizedTimeSpineStage {
+  key: string;
+  label: string;
+  order: number;
+  status: string;
+  timestamp?: string | null;
+  risk_level?: string | null;
+  explanation?: string | null;
+}
+
+export interface CommitmentDetailResponse extends SavedCommitment {
+  tasks: TaskSchema[];
+  time_spine_stages: NormalizedTimeSpineStage[];
+  focus_blocks: FocusBlockSchema[];
+  reflections: ReflectionSchema[];
+  current_stage?: string | null;
+}
