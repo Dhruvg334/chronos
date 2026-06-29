@@ -179,10 +179,10 @@ Instead of a monolithic router, we construct six dedicated graphs:
 * **Tasks**: Build the drift event logging API. Configure the Replanner agent node to suggest calendar adjustments. Queue proposals in `agent_proposed_actions`.
 * **Verification**: Log a drift event (e.g., "Overran task by 60 minutes"), confirm it triggers a recalculation, and verify that the proposed calendar shift appears in the Decision Dock.
 
-### Phase 8: Rescue Mode & Renegotiation Templates
-* **Files to create**: `/backend/app/api/v1/rescue.py`, `/frontend/src/pages/Rescue.tsx`
-* **Tasks**: Implement the Rescue agent workflow (generating MVCP and quality tradeoffs). Build the Negotiator template generator.
-* **Verification**: Manually trigger Rescue mode, verify that the MVCP checklist displays in the Rescue Terminal, and confirm it outputs copyable communication templates.
+### [COMPLETED] Phase 6: Rescue Mode & Chaos Handling
+* **Files created**: `/backend/app/services/rescue_service.py`, `/backend/app/services/rescue_graph.py`, `/backend/app/api/v1/rescue.py`
+* **Tasks**: Implemented the Rescue agent workflow generating fallback-safe renegotiation templates, defer task strategies, and emergency focus blocks using the single `commitment_rescue` action type. Rendered rescue proposals inside `DecisionDock.tsx`.
+* **Verification**: Verified using `test_rescue.py` and local manual testing on the Command Canvas UI.
 
 ### Phase 9: Reflections Engine & Memory Calibration
 * **Files to create**: `/backend/app/api/v1/reflection.py`, `/backend/app/agents/nodes/reflect.py`

@@ -42,3 +42,9 @@ When completing a focus block via `POST /api/v1/focus-blocks/{id}/complete`, the
 
 ## 8. Time Spine Normalization
 The `spine_json` array stored in the database only holds static label/id data. The backend `time_spine_service` dynamically normalizes this data based on the `current_stage` pointer to return actionable statuses (`active`, `pending`, `completed`) rather than duplicating stateful values inside the JSON array.
+
+### AD-009: Rescue Mode & Generic Enum Pattern
+- **Context**: Rescue mode requires various actions (`create_rescue_focus_block`, `compress_scope`, `save_renegotiation_draft`), which would cause high enum churn if added directly to Postgres types.
+- **Decision**: Added a single `commitment_rescue` enum value. The specific action is embedded within `payload_json.rescue_action_type`.
+- **Implementation**: `rescue_graph.py` orchestrates the rescue context, relying entirely on deterministic math (e.g. `available_minutes / effort_remaining_minutes`) to select the correct rescue action type.
+- **Security Constraint**: Gemini is ONLY used for fallback-safe renegotiation drafting. It does not dictate logic, handle OAuth tokens, or send external messages. Calendar write-back and external messaging remain strictly deferred to enforce human-in-the-loop isolation.

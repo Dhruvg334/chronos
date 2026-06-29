@@ -12,7 +12,7 @@ This document tracks the live implementation status of ChronOS core modules, dat
 - [x] **Phase 4**: Real-time mock APIs mapped to Google Calendar & Free/Busy Sync.
 - [x] **Phase 4.5**: Production Security Hardening (Supabase Vault for OAuth tokens).
 - [x] **Phase 5**: Agentic Auto-Scheduling (LangGraph) & Eventual Rescheduling loops.
-- [ ] **Phase 6**: Rescue Mode & Chaos handling.
+- [x] **Phase 6**: Rescue Mode & Chaos handling.
 
 ---
 
@@ -52,8 +52,10 @@ This document tracks the live implementation status of ChronOS core modules, dat
 | `POST /api/v1/reflection` | Submit standalone reflection | 🟢 Completed | 🟢 Completed | 🟢 Completed |
 | `GET /api/v1/calendar/*` | Google login & calendar sync | 🟡 Mocked | 🔴 Not Started | 🔴 Not Started |
 | `POST /api/v1/drift` | Log drift mismatch and run replanner | 🟡 Mocked | 🔴 Not Started | 🔴 Not Started |
-| `GET /api/v1/agent/proposed` | Fetch pending decisions for Decision Dock | 🟡 Mocked | 🔴 Not Started | 🔴 Not Started |
-| `POST /api/v1/agent/rescue` | Manually activate Rescue plan | 🟡 Mocked | 🔴 Not Started | 🔴 Not Started |
+| `GET /api/v1/agent/proposed` | Fetch pending decisions for Decision Dock | 🟢 Completed | 🔴 Not Started | 🔴 Not Started |
+| `GET /api/v1/rescue/candidates` | Fetch rescue candidates based on risk/capacity | 🟢 Completed | 🟢 Completed | 🟢 Completed |
+| `POST /api/v1/rescue/{id}/plan` | Manually activate Rescue plan | 🟢 Completed | 🟢 Completed | 🟢 Completed |
+| `POST /api/v1/rescue/proposals/{id}/approve` | Approve a rescue action | 🟢 Completed | 🟢 Completed | 🟢 Completed |
 
 ---
 
@@ -64,4 +66,4 @@ This document tracks the live implementation status of ChronOS core modules, dat
 | Command Canvas | `Command.tsx` - Details, Time Spine, Focus Console | 🟢 Completed | 🟢 Enforced |
 | Inbox / AI Intake | `Inbox.tsx` - AI Brain Dump to Structured Drafts | 🟢 Completed | 🟢 Enforced |
 | Landing Page | `Landing.tsx` - Placeholder structure | 🟢 Completed | 🟢 Enforced |
-| Calendar/Rescue | Mock layouts | 🟡 Mocked | 🔴 Not Started |
+| Calendar/Rescue | Mock layouts and Rescue Candidates panel | 🟢 Completed | 🟢 Enforced |

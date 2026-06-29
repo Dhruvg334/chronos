@@ -29,9 +29,14 @@ export default function Command() {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [dockKey, setDockKey] = useState(0);
 
+  // Rescue states
+  const [rescueCandidates, setRescueCandidates] = useState<any[]>([]);
+  const [runningRescue, setRunningRescue] = useState<string | null>(null);
+
   const refreshAll = async () => {
     await fetchCommitments();
     await fetchCapacity();
+    await fetchRescueCandidates();
     if (selectedId) await fetchDetail(selectedId);
     setDockKey(prev => prev + 1);
   };
@@ -90,9 +95,37 @@ export default function Command() {
     }
   };
 
+  const fetchRescueCandidates = async () => {
+    try {
+      const res = await fetch(apiUrl('/api/v1/rescue/candidates'));
+      if (res.ok) {
+        const data = await res.json();
+        setRescueCandidates(data.candidates || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRunRescue = async (cid: string) => {
+    setRunningRescue(cid);
+    try {
+      const res = await fetch(apiUrl(`/api/v1/rescue/${cid}/plan`), { method: 'POST' });
+      if (res.ok) {
+        setDockKey(prev => prev + 1);
+        await fetchRescueCandidates();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRunningRescue(null);
+    }
+  };
+
   useEffect(() => {
     fetchCommitments();
     fetchCapacity();
+    fetchRescueCandidates();
   }, []);
 
   useEffect(() => {
@@ -201,6 +234,28 @@ export default function Command() {
                 <span className="text-2xl font-extrabold text-[#3D663D]">{capacity.available_minutes} <span className="text-sm font-medium text-[#7A7771]">mins</span></span>
                 <span className="text-xs font-medium text-[#998877]">{capacity.busy_blocks_count} busy blocks</span>
               </div>
+            </div>
+          )}
+
+          {rescueCandidates.length > 0 && (
+            <div className="bg-[#FFF5F5] border border-[#993333] rounded-xl p-4 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-[#993333]"></div>
+              <h3 className="text-sm font-bold text-[#993333] mb-1 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" /> Rescue Candidates ({rescueCandidates.length})
+              </h3>
+              <p className="text-xs text-[#2C2B29] mb-3 font-medium truncate">
+                Top risk: {rescueCandidates[0].title}
+              </p>
+              <p className="text-xs text-[#993333] mb-3">
+                {rescueCandidates[0]._rescue_reason}
+              </p>
+              <button
+                onClick={() => handleRunRescue(rescueCandidates[0].id)}
+                disabled={runningRescue === rescueCandidates[0].id}
+                className="w-full px-3 py-1.5 bg-[#993333] text-white text-xs font-bold rounded hover:bg-[#802b2b] transition-colors disabled:opacity-50"
+              >
+                {runningRescue === rescueCandidates[0].id ? 'Running...' : 'Run Rescue Plan'}
+              </button>
             </div>
           )}
 
