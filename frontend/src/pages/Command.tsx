@@ -97,7 +97,6 @@ export default function Command() {
   };
 
   const handleLoadDemo = async () => {
-    // If called from EmptyState, it should act just like DemoModeCard confirmation
     try {
       await fetch(apiUrl('/api/v1/demo/load'), { method: 'POST' });
       await refreshAll();
@@ -206,18 +205,19 @@ export default function Command() {
 
   const getRiskColor = (level?: string) => {
     switch (level) {
-      case 'rescue_required': return 'bg-[#993333] text-white';
-      case 'critical': return 'bg-[#CC6633] text-white';
-      case 'at_risk': return 'bg-[#D1CCC2] text-[#2C2B29]';
-      case 'watch': return 'bg-[#FDF3E1] text-[#997328]';
-      case 'stable': return 'bg-[#EAF3EA] text-[#3D663D]';
-      default: return 'bg-[#E5E0D8] text-[#5C5A56]';
+      case 'rescue_required': return 'bg-risk-critical text-white';
+      case 'critical': return 'bg-risk-atrisk text-white';
+      case 'at_risk': return 'bg-warm-border text-text-primary';
+      case 'watch': return 'bg-warm-cream text-risk-watch';
+      case 'stable': return 'bg-green-50 text-risk-stable';
+      default: return 'bg-warm-border text-text-secondary';
     }
   };
 
   return (
     <AppShell>
-      <div className="flex flex-col h-full overflow-y-auto pr-2 pb-12 max-w-5xl mx-auto">
+      {/* max-w-3xl for visual baseline with Settings.tsx */}
+      <div className="flex flex-col h-full overflow-y-auto pr-2 pb-12 max-w-3xl mx-auto">
         <CommandHero onAnalyze={handleRunAnalysis} isAnalyzing={isAnalyzing} onLoadDemo={handleLoadDemo} />
         
         {commitments.length === 0 && !loadingList ? (
@@ -229,184 +229,190 @@ export default function Command() {
         ) : (
           <>
             <DailyCommandBrief brief={brief} />
-            
-            <div className="mb-8">
-              <DecisionDock key={dockKey} onRefresh={refreshAll} />
-            </div>
+            <DecisionDock key={dockKey} onRefresh={refreshAll} />
 
             {rescueCandidates.length > 0 && (
-              <div className="bg-[#FFF8F0] border-l-4 border-l-[#CC6633] border-y border-r border-[#E5E0D8] rounded-r-xl p-5 mb-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="bg-red-50 border-l-4 border-l-risk-atrisk border-y border-r border-warm-border rounded-r-xl p-5 mb-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <h3 className="text-base font-bold text-[#2C2B29] mb-1 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-[#CC6633]" /> 
+                  <h3 className="text-base font-bold text-text-primary mb-1 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-risk-atrisk" /> 
                     Timeline needs attention
                     <InfoHint content="Commitments that may miss their deadline unless you change the plan." />
                   </h3>
-                  <p className="text-sm text-[#5C5A56]">
-                    <strong>{rescueCandidates[0].title}</strong> may miss its deadline because {rescueCandidates[0]._rescue_reason.toLowerCase()}
+                  <p className="text-sm text-text-secondary">
+                    <strong>{rescueCandidates[0].title}</strong> may miss its deadline because {rescueCandidates[0]._rescue_reason?.toLowerCase() || 'remaining effort exceeds available focus time.'}
                   </p>
                 </div>
                 <button
                   onClick={() => handleRunRescue(rescueCandidates[0].id)}
                   disabled={runningRescue === rescueCandidates[0].id}
-                  className="px-4 py-2 bg-white border border-[#CC6633] text-[#CC6633] text-sm font-bold rounded-lg hover:bg-[#FFF5F5] transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
+                  className="px-4 py-2 bg-white border border-risk-atrisk text-risk-atrisk text-sm font-bold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
                 >
                   {runningRescue === rescueCandidates[0].id ? 'Generating...' : 'Review rescue options'}
                 </button>
               </div>
             )}
 
+            {/* Divider */}
+            <hr className="border-warm-border my-8" />
+
             {/* Main Detail Canvas */}
             <div className="w-full flex flex-col gap-6">
               {!detail ? (
-                <div className="flex-1 flex items-center justify-center text-[#7A7771] bg-[#FAF9F6] rounded-xl border border-[#E5E0D8] border-dashed min-h-[200px]">
+                <div className="flex-1 flex items-center justify-center text-text-muted bg-warm-ivory rounded-xl border border-warm-border border-dashed min-h-[200px]">
                   {loadingDetail ? 'Loading details...' : 'Select a commitment below to view its canvas'}
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white border border-[#E5E0D8] rounded-2xl p-6 shadow-sm flex flex-col">
-                      <div className="flex justify-between items-start mb-6">
-                        <div>
-                          <h3 className="text-lg font-bold text-[#2C2B29] flex items-center gap-2">
-                            <Play className="w-5 h-5 text-[#B57C45]" />
-                            Active Focus Console
-                          </h3>
-                        </div>
-                        <div className="text-right">
-                          <h4 className="font-bold text-[#2C2B29] truncate max-w-[200px]" title={detail.title}>{detail.title}</h4>
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${getRiskColor(detail.risk_level)}`}>
-                            {detail.risk_level.replace('_', ' ')}
-                          </span>
-                        </div>
+                <div className="space-y-6">
+                  {/* Active Focus Console */}
+                  <div className="bg-warm-cream border border-warm-border rounded-xl p-6 shadow-sm flex flex-col">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                          <Play className="w-5 h-5 text-accent-amber" />
+                          Active Focus Console
+                        </h3>
                       </div>
-                      <div className="flex-1">
-                        {detail.focus_blocks.filter(b => b.status === 'scheduled' || b.status === 'active').length === 0 ? (
-                          <div className="text-center py-6">
-                            <p className="text-[#5C5A56] mb-4 text-sm">No active focus block.</p>
-                            <button 
-                              onClick={handleCreateBlock}
-                              disabled={creatingBlock}
-                              className="px-4 py-2 bg-[#FAF9F6] border border-[#E5E0D8] text-[#2C2B29] text-sm font-semibold rounded-lg hover:bg-[#E5E0D8] transition-colors shadow-sm"
-                            >
-                              {creatingBlock ? 'Scheduling...' : 'Start Manual Focus Block'}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {detail.focus_blocks.filter(b => b.status === 'scheduled' || b.status === 'active').map(block => (
-                              <div key={block.id} className={`p-4 rounded-xl border ${block.status === 'active' ? 'border-[#CC6633] bg-[#FDF3E1]' : 'border-[#E5E0D8] bg-[#FAF9F6]'}`}>
-                                <div className="flex justify-between items-start mb-2">
-                                  <div className="font-semibold text-[#2C2B29] text-sm">{block.title}</div>
-                                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${block.status === 'active' ? 'bg-[#CC6633] text-white' : 'bg-[#D1CCC2] text-[#4A4844]'}`}>
-                                    {block.status}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-[#7A7771] mb-4">
-                                  {new Date(block.start_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(block.end_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                  {block.status === 'scheduled' && (
-                                    <button 
-                                      onClick={() => handleStartBlock(block.id)}
-                                      className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-[#2C2B29] text-white text-xs font-medium rounded hover:bg-black transition-colors"
-                                    >
-                                      <Play className="w-3 h-3" /> Start
-                                    </button>
-                                  )}
-                                  {block.status === 'active' && (
-                                    <button 
-                                      onClick={() => setReflectionBlockId(block.id)}
-                                      className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-[#3D663D] text-white text-xs font-medium rounded hover:bg-[#2F4D2F] transition-colors"
-                                    >
-                                      <Check className="w-3 h-3" /> Complete
-                                    </button>
-                                  )}
-                                  <button 
-                                    onClick={() => setSkipBlockId(block.id)}
-                                    className="px-3 py-1.5 border border-[#D1CCC2] text-[#5C5A56] text-xs font-medium rounded hover:bg-[#E5E0D8] transition-colors flex items-center justify-center"
-                                  >
-                                    <SkipForward className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div className="text-right">
+                        <h4 className="font-bold text-text-primary truncate max-w-[200px]" title={detail.title}>{detail.title}</h4>
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${getRiskColor(detail.risk_level)}`}>
+                          {detail.risk_level.replace('_', ' ')}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="bg-white border border-[#E5E0D8] rounded-2xl p-6 shadow-sm">
-                      <h3 className="text-lg font-bold text-[#2C2B29] mb-4 flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-[#3D663D]" />
-                        Time Spine
-                        <InfoHint content="The staged execution path ChronOS builds from intention to completion." />
-                      </h3>
-                      <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2">
-                        {detail.time_spine_stages.length === 0 ? (
-                          <div className="text-[#7A7771] text-sm">No spine generated yet.</div>
-                        ) : (
-                          <div className="relative">
-                            <div className="absolute left-[9px] top-2 bottom-2 w-0.5 bg-[#E5E0D8]"></div>
-                            {detail.time_spine_stages.map((stage: NormalizedTimeSpineStage) => (
-                              <div key={stage.key} className="flex gap-4 relative z-10 mb-4 last:mb-0">
-                                <div className="mt-1">
-                                  {stage.status === 'completed' ? (
-                                    <CheckCircle2 className="w-5 h-5 text-[#3D663D] bg-white" />
-                                  ) : stage.status === 'active' ? (
-                                    <Circle className="w-5 h-5 text-[#B57C45] fill-white bg-white" />
-                                  ) : (
-                                    <Circle className="w-5 h-5 text-[#D1CCC2] bg-white" />
-                                  )}
-                                </div>
-                                <div>
-                                  <div className={`text-sm font-semibold ${stage.status === 'completed' ? 'text-[#998877] line-through' : stage.status === 'active' ? 'text-[#B57C45]' : 'text-[#4A4844]'}`}>
-                                    {stage.label}
-                                  </div>
-                                  {stage.explanation && (
-                                    <div className="text-xs text-[#7A7771] mt-0.5">{stage.explanation}</div>
-                                  )}
-                                </div>
+                    <div className="flex-1">
+                      {detail.focus_blocks.filter(b => b.status === 'scheduled' || b.status === 'active').length === 0 ? (
+                        <div className="text-center py-6 bg-white rounded-lg border border-warm-border">
+                          <p className="text-text-secondary mb-4 text-sm">No active focus block.</p>
+                          <button 
+                            onClick={handleCreateBlock}
+                            disabled={creatingBlock}
+                            className="px-4 py-2 bg-warm-ivory border border-warm-border text-text-primary text-sm font-semibold rounded-lg hover:bg-warm-border transition-colors shadow-sm"
+                          >
+                            {creatingBlock ? 'Scheduling...' : 'Start Manual Focus Block'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {detail.focus_blocks.filter(b => b.status === 'scheduled' || b.status === 'active').map(block => (
+                            <div key={block.id} className={`p-4 rounded-xl border ${block.status === 'active' ? 'border-accent-amber bg-warm-cream' : 'border-warm-border bg-white'}`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="font-semibold text-text-primary text-sm">{block.title}</div>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${block.status === 'active' ? 'bg-accent-amber text-white' : 'bg-warm-border text-text-secondary'}`}>
+                                  {block.status}
+                                </span>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              <div className="text-xs text-text-muted mb-4">
+                                {new Date(block.start_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(block.end_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </div>
+                              
+                              <div className="flex gap-2">
+                                {block.status === 'scheduled' && (
+                                  <button 
+                                    onClick={() => handleStartBlock(block.id)}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-text-primary text-white text-xs font-medium rounded hover:bg-black transition-colors"
+                                  >
+                                    <Play className="w-3 h-3" /> Start
+                                  </button>
+                                )}
+                                {block.status === 'active' && (
+                                  <button 
+                                    onClick={() => setReflectionBlockId(block.id)}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-risk-stable text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+                                  >
+                                    <Check className="w-3 h-3" /> Complete
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => setSkipBlockId(block.id)}
+                                  className="px-3 py-1.5 border border-warm-border text-text-secondary text-xs font-medium rounded hover:bg-warm-border transition-colors flex items-center justify-center"
+                                >
+                                  <SkipForward className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </>
+
+                  {/* Time Spine */}
+                  <div className="bg-warm-cream border border-warm-border rounded-xl p-6 shadow-sm">
+                    <h3 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-risk-stable" />
+                      Time Spine
+                      <InfoHint content="The staged execution path ChronOS builds from intention to completion." />
+                    </h3>
+                    <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2">
+                      {detail.time_spine_stages.length === 0 ? (
+                        <div className="text-text-muted text-sm bg-white p-4 rounded-lg border border-warm-border">No spine generated yet.</div>
+                      ) : (
+                        <div className="relative bg-white p-4 rounded-lg border border-warm-border">
+                          <div className="absolute left-[25px] top-4 bottom-4 w-0.5 bg-warm-border"></div>
+                          {detail.time_spine_stages.map((stage: NormalizedTimeSpineStage) => (
+                            <div key={stage.key} className="flex gap-4 relative z-10 mb-4 last:mb-0">
+                              <div className="mt-1">
+                                {stage.status === 'completed' ? (
+                                  <CheckCircle2 className="w-5 h-5 text-risk-stable bg-white" />
+                                ) : stage.status === 'active' ? (
+                                  <Circle className="w-5 h-5 text-accent-amber fill-white bg-white" />
+                                ) : (
+                                  <Circle className="w-5 h-5 text-warm-border bg-white" />
+                                )}
+                              </div>
+                              <div>
+                                <div className={`text-sm font-semibold ${stage.status === 'completed' ? 'text-text-muted line-through' : stage.status === 'active' ? 'text-accent-amber' : 'text-text-primary'}`}>
+                                  {stage.label}
+                                </div>
+                                {stage.explanation && (
+                                  <div className="text-xs text-text-secondary mt-0.5">{stage.explanation}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 
-            <div className="mt-12 pt-8 border-t border-[#E5E0D8]">
-              <h3 className="text-lg font-bold text-[#2C2B29] mb-4">Other Commitments</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {commitments.filter(c => c.id !== selectedId).map(c => (
-                  <div 
-                    key={c.id} 
-                    onClick={() => setSelectedId(c.id)}
-                    className="p-3 rounded-xl cursor-pointer transition-all border bg-white border-[#E5E0D8] hover:border-[#D1CCC2] hover:shadow-sm"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-semibold text-sm text-[#2C2B29] truncate pr-2">{c.title}</h4>
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap ${getRiskColor(c.risk_level)}`}>
-                        {c.risk_level.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-[#7A7771]">
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {c.actual_minutes}/{c.estimated_minutes}m</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Divider */}
+            <hr className="border-warm-border my-8" />
 
-            <div className="mt-8">
-              <h3 className="text-lg font-bold text-[#2C2B29] mb-4">System Console</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <CalendarConnection />
-                <DemoModeCard onLoadDemo={handleLoadDemo} />
+            {/* Lower Priority Sections */}
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-lg font-bold text-text-primary mb-4">Other Commitments</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {commitments.filter(c => c.id !== selectedId).map(c => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => setSelectedId(c.id)}
+                      className="p-4 rounded-xl cursor-pointer transition-all border bg-white border-warm-border hover:border-text-muted hover:shadow-sm"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-sm text-text-primary truncate pr-2">{c.title}</h4>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap ${getRiskColor(c.risk_level)}`}>
+                          {c.risk_level.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-text-muted">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {c.actual_minutes}/{c.estimated_minutes}m</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-text-primary mb-4">Connections & Demo Tools</h3>
+                <div className="space-y-4">
+                  <CalendarConnection />
+                  <DemoModeCard onLoadDemo={handleLoadDemo} />
+                </div>
               </div>
             </div>
 

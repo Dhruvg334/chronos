@@ -9,6 +9,5 @@
 - **Phase 6:** Rescue Mode & Chaos Handling (Completed)
 - **Phase 7A:** Demo Clarity & UX Restyling (Completed)
   - UX Correction: Replaced dark hackathon aesthetic with calm, warm Inbox aesthetic.
-  - Hierarchy Correction: CommandHero -> Daily Brief -> Actionable Approvals -> Canvas.
-  - Added in-product guidance (InfoHint, How ChronOS Works).
+  - Command Simplification (Phase 7A.2): Aligned completely with Settings.tsx, refactored to semantic tokens, progressive disclosure for approvals.
 - **Phase 7B:** Deferred
