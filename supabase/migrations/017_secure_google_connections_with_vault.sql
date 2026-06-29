@@ -31,23 +31,34 @@ CREATE OR REPLACE FUNCTION public.set_google_tokens(
 DECLARE
     v_access_secret_id UUID;
     v_refresh_secret_id UUID;
+    v_existing_access_id UUID;
     v_existing_refresh_id UUID;
 BEGIN
-    -- Look up existing connection if any
-    SELECT refresh_token_secret_id INTO v_existing_refresh_id 
-    FROM public.google_connections 
+    -- Look up existing connection if any. Keep the refresh token only when Google
+    -- does not return a new one during access-token refresh.
+    SELECT access_token_secret_id, refresh_token_secret_id
+    INTO v_existing_access_id, v_existing_refresh_id
+    FROM public.google_connections
     WHERE user_id = p_user_id;
 
-    -- Store access token in vault
-    SELECT vault.create_secret(p_access_token, 'google_access_token_' || p_user_id, 'Google access token') 
+    -- Prevent stale access-token secrets from accumulating in Vault.
+    IF v_existing_access_id IS NOT NULL THEN
+        PERFORM vault.delete_secret(v_existing_access_id);
+    END IF;
+
+    -- Store the new access token in Vault.
+    SELECT vault.create_secret(p_access_token, 'google_access_token_' || p_user_id, 'Google access token')
     INTO v_access_secret_id;
 
-    -- Handle refresh token
+    -- Handle refresh token. If Google returns a new one, replace the old Vault
+    -- secret. If not, preserve the existing refresh-token secret reference.
     IF p_refresh_token IS NOT NULL AND p_refresh_token <> '' THEN
-        SELECT vault.create_secret(p_refresh_token, 'google_refresh_token_' || p_user_id, 'Google refresh token') 
+        IF v_existing_refresh_id IS NOT NULL THEN
+            PERFORM vault.delete_secret(v_existing_refresh_id);
+        END IF;
+        SELECT vault.create_secret(p_refresh_token, 'google_refresh_token_' || p_user_id, 'Google refresh token')
         INTO v_refresh_secret_id;
     ELSE
-        -- If no new refresh token, keep the old one
         v_refresh_secret_id := v_existing_refresh_id;
     END IF;
 

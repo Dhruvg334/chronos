@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/calendar/callback"
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/google/auth/callback"
+    GOOGLE_SCOPES: str = "https://www.googleapis.com/auth/calendar.readonly"
+    FRONTEND_URL: str = "http://localhost:5173"
+    GOOGLE_OAUTH_STATE_SECRET: str = ""
     
     # Encryption key (32-byte url-safe base64 string)
     ENCRYPTION_KEY: str = ""
