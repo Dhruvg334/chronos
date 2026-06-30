@@ -5,6 +5,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import About from './pages/About';
+import Demo from './pages/Demo';
 import Command from './pages/Command';
 import Inbox from './pages/Inbox';
 import Calendar from './pages/Calendar';
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/about" element={<About />} />
+          <Route path="/demo" element={<Demo />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>

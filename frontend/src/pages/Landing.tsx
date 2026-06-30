@@ -32,11 +32,14 @@ export default function Landing() {
 
         {session ? (
           <Link to="/command" className="inline-block px-8 py-3 text-base font-bold text-white bg-accent-amber rounded-xl hover:bg-accent-terracotta transition-colors shadow-sm w-full sm:w-auto">
-            Open Command Dashboard
+            Open Command
           </Link>
         ) : (
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link to="/signup" className="w-full sm:w-auto px-8 py-3 text-base font-bold text-white bg-accent-amber rounded-xl hover:bg-accent-terracotta transition-colors shadow-sm text-center">
+            <Link to="/demo" className="w-full sm:w-auto px-8 py-3 text-base font-bold text-white bg-accent-amber rounded-xl hover:bg-accent-terracotta transition-colors shadow-sm text-center">
+              Try demo
+            </Link>
+            <Link to="/signup" className="w-full sm:w-auto px-8 py-3 text-base font-bold text-text-primary bg-white border border-warm-border rounded-xl hover:bg-warm-ivory transition-colors shadow-sm text-center">
               Sign up
             </Link>
             <Link to="/login" className="w-full sm:w-auto px-8 py-3 text-base font-bold text-text-secondary bg-warm-ivory border border-warm-border rounded-xl hover:bg-warm-border transition-colors shadow-sm text-center">

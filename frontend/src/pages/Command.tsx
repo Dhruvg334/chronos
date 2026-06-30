@@ -115,13 +115,20 @@ export default function Command() {
 
   const handleLoadDemo = async () => {
     setPageError(null);
-    const res = await fetch(apiUrl('/api/v1/demo/load'), { method: 'POST' });
-    if (!res.ok) {
-      throw new Error(await getApiErrorMessage(res, 'ChronOS could not load the demo scenario.'));
+    try {
+      const res = await fetch(apiUrl('/api/v1/demo/load'), { method: 'POST' });
+      if (!res.ok) {
+        const fallback = res.status === 401
+          ? 'Your session could not be verified. Please log out, log in again, and retry the sample scenario.'
+          : 'ChronOS could not load the sample scenario.';
+        throw new Error(await getApiErrorMessage(res, fallback));
+      }
+      await refreshAll();
+      setBrief(null);
+      showActionMessage('Sample scenario loaded. Run analysis to review the recovery plan.');
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : 'ChronOS could not load the sample scenario.');
     }
-    await refreshAll();
-    setBrief(null);
-    showActionMessage('Demo scenario loaded. Run analysis to review the recovery plan.');
   };
 
   const handleRunRescue = async (cid: string) => {

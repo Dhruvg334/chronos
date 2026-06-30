@@ -7,3 +7,10 @@
 5. **Security**: Supabase Vault used to store Google OAuth tokens. No plaintext tokens in database. Service role required for decryption.
 6. **UI Language & Layout Rules**: Uses semantic tokens defined in `tailwind.config.js`. Warm ivory (`bg-warm-ivory`), clean white containers, subtle borders (`border-warm-border`), soft amber primary actions (`bg-accent-amber`). No hardcoded hex values. 
 7. **Layout Widths**: Wide workspace pages (Command, Inbox, Calendar, Rescue, Reflection) utilize `max-w-6xl` for broad horizontal real estate to prevent title truncation. Narrow utility pages (Settings, About, Login, Signup) use `max-w-3xl` or `max-w-4xl` for calm, focused reading and form entry.
+
+## Phase 7C.2 Guest Demo and Auth Stability Cleanup
+- Added a public, view-only demo route so unauthenticated users can understand ChronOS before signing up.
+- Fixed backend Supabase Auth validation to use the shared Settings object rather than raw environment variables, preventing false 401s when `.env` is loaded by pydantic.
+- Improved logout visibility and redirect behavior.
+- Replaced judge-specific demo language with product-grade sample scenario wording.
+- Preserved protected app data boundaries: live workspace actions still require authentication.

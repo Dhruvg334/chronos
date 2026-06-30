@@ -22,7 +22,7 @@ People don't only forget tasks; they lose control when commitments, deadlines, l
 * **Schedule Proposal Agent**: LangGraph-based stateful agent proposing deep work blocks.
 * **Rescue Mode**: Intervenes on failing commitments with scope compression, deadline renegotiation, or urgent recovery blocks.
 * **Decision Dock**: A consolidated UI queue for human review of all AI proposals.
-* **Daily Command Brief**: At-a-glance dashboard of Time Health and next best actions.
+* **Daily Command Brief**: At-a-glance summary of Time Health and next best actions.
 * **Reflection Loop**: Log actual effort after focus blocks to improve future risk modeling.
 * **Supabase Auth + Google Login**: Secure account management.
 * **Supabase Vault token security**: Google OAuth tokens are stored securely in Supabase Vault, inaccessible to the frontend.
@@ -175,14 +175,22 @@ To use authentication locally or in production, configure your Supabase Dashboar
 * Ensure the frontend uses the correct callback route to exchange OAuth hashes.
 
 ## Demo flow
+
+### Public demo, no account required
+1. Open `http://localhost:5173`.
+2. Click **Try demo**.
+3. Review the sample commitments, Time Health, and agent suggestions.
+4. Use this page to understand the product loop before creating an account.
+
+### Authenticated product flow
 1. Sign up or log in.
-2. Open Command dashboard.
-3. Scroll down and click **Load Judge Demo** from Connections & Demo Tools.
+2. Open Command.
+3. Scroll down to Connections and load the **sample scenario**.
 4. Click **Run ChronOS Analysis**.
 5. Review the updated **Daily Command Brief** and Time Health.
-6. Expand **Pending Approvals** to view proposed actions securely grouped by commitment.
-7. Approve/reject a proposed action.
-8. Review the Rescue, Focus, and Reflection flow in the Active Focus Console.
+6. Expand **Pending Approvals** to view proposed actions grouped by commitment.
+7. Approve or reject a proposed action.
+8. Review the Rescue, Focus, and Reflection flow in the Execution Workspace.
 
 ## Screenshots
 
@@ -207,4 +215,4 @@ To use authentication locally or in production, configure your Supabase Dashboar
 * Gmail extraction is deferred to a future phase.
 
 ## Contribution status
-Built for a hackathon submission, but strictly structured as a real product foundation with enterprise-grade security and RLS data isolation.
+Built for a hackathon submission, but structured like a real product foundation: clear auth boundaries, RLS-aware data access, human-approved agent actions, and honest limitations.

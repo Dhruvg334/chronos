@@ -148,6 +148,9 @@ def exchange_code_for_token(code: str, state: str) -> None:
 
 def get_connection_status(user_id: str) -> Dict[str, Any]:
     """Return safe connection status without leaking tokens or Vault IDs."""
+    if supabase_client is None:
+        return {"connected": False}
+
     try:
         res = (
             supabase_client.table("google_connections")
@@ -164,7 +167,7 @@ def get_connection_status(user_id: str) -> Dict[str, Any]:
                 "last_synced_at": res.data.get("last_synced_at"),
                 "token_expires_at": res.data.get("expires_at"),
             }
-    except APIError:
+    except (APIError, AttributeError):
         pass
 
     return {"connected": False}
@@ -172,6 +175,9 @@ def get_connection_status(user_id: str) -> Dict[str, Any]:
 
 def disconnect(user_id: str) -> None:
     """Remove the Google connection and Vault material for the user."""
+    if supabase_client is None:
+        return
+
     try:
         supabase_client.rpc("delete_google_connection", {"p_user_id": user_id}).execute()
     except APIError as e:
@@ -180,6 +186,9 @@ def disconnect(user_id: str) -> None:
 
 def get_valid_credentials(user_id: str) -> Optional[Credentials]:
     """Retrieve and optionally refresh the credentials for a user."""
+    if supabase_client is None:
+        return None
+
     try:
         res = supabase_client.rpc("get_decrypted_google_tokens", {"p_user_id": user_id}).execute()
         if not res.data:

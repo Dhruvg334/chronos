@@ -15,3 +15,10 @@
 - Google Calendar integration is read-only (Phase 4 scope limit).
 - Auto-scheduling write-back is disabled.
 - "Sprint Timer" and "Starter Asset Generator" (Phase 7B) are deferred.
+
+## Phase 7C.2 Guest Demo and Auth Stability Cleanup
+- Added a public, view-only demo route so unauthenticated users can understand ChronOS before signing up.
+- Fixed backend Supabase Auth validation to use the shared Settings object rather than raw environment variables, preventing false 401s when `.env` is loaded by pydantic.
+- Improved logout visibility and redirect behavior.
+- Replaced judge-specific demo language with product-grade sample scenario wording.
+- Preserved protected app data boundaries: live workspace actions still require authentication.

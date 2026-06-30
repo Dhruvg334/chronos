@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -8,6 +8,7 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { session, signOut } = useAuth();
 
   const navItems = [
@@ -65,15 +66,23 @@ export default function AppShell({ children }: AppShellProps) {
                 {session.user.email}
               </div>
               <button
-                onClick={() => signOut()}
-                className="flex items-center gap-1 text-text-secondary hover:text-risk-atrisk transition-colors p-1"
+                onClick={async () => {
+                  await signOut();
+                  navigate('/');
+                }}
+                className="flex items-center gap-1 rounded-full border border-warm-border bg-white px-3 py-1.5 text-text-secondary transition-colors hover:border-risk-atrisk hover:text-risk-atrisk"
                 title="Log out"
+                aria-label="Log out"
               >
                 <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </>
           ) : (
             <div className="flex items-center gap-4">
+              <Link to="/demo" className="text-text-secondary hover:text-text-primary font-semibold transition-colors">
+                Try demo
+              </Link>
               <Link to="/login" className="text-text-secondary hover:text-text-primary font-semibold transition-colors">
                 Log in
               </Link>

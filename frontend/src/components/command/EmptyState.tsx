@@ -15,7 +15,7 @@ export function EmptyState({ onLoadDemo }: EmptyStateProps) {
       </div>
       <h2 className="text-2xl font-bold text-text-primary mb-3">No commitments yet</h2>
       <p className="text-text-secondary max-w-md mx-auto mb-8 leading-relaxed">
-        ChronOS needs something to manage. You can either paste a messy brain dump into the Inbox, or load the Judge Demo to see how ChronOS rescues a slipping deadline.
+        ChronOS needs something to manage. You can either paste a messy brain dump into the Inbox, or load a sample scenario to see how ChronOS rescues a slipping deadline.
       </p>
       
       <div className="flex flex-col sm:flex-row gap-4">
@@ -30,7 +30,7 @@ export function EmptyState({ onLoadDemo }: EmptyStateProps) {
           onClick={onLoadDemo}
           className="px-6 py-2.5 font-semibold text-text-secondary bg-white border border-warm-border rounded-lg hover:bg-warm-ivory transition-colors shadow-sm"
         >
-          Load Judge Demo
+          Load sample scenario
         </button>
       </div>
     </div>

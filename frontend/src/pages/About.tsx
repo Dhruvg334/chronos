@@ -7,7 +7,7 @@ export default function About() {
       <nav className="w-full max-w-4xl mx-auto px-6 py-4 flex justify-between items-center border-b border-warm-border">
         <Link to="/" className="text-xl font-extrabold tracking-tight">ChronOS</Link>
         <div className="flex items-center gap-4">
-          <Link to="/command" className="text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors">Command Dashboard</Link>
+          <Link to="/command" className="text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors">Command</Link>
         </div>
       </nav>
 
@@ -54,13 +54,13 @@ export default function About() {
 
         <section className="bg-white p-8 rounded-2xl border border-warm-border shadow-sm">
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <CheckCircle2 className="w-6 h-6 text-blue-500" />
+            <CheckCircle2 className="w-6 h-6 text-risk-stable" />
             How to use ChronOS
           </h2>
           <ol className="list-decimal list-inside space-y-3 text-text-secondary">
             <li><strong>Brain dump</strong> commitments into the Inbox.</li>
             <li><strong>Review</strong> and adjust extracted deadlines and effort estimates.</li>
-            <li><strong>Run ChronOS Analysis</strong> from the Command dashboard.</li>
+            <li><strong>Run ChronOS Analysis</strong> from Command.</li>
             <li><strong>Review suggested actions</strong> (focus blocks or rescue interventions) in the Decision Dock.</li>
             <li><strong>Approve</strong> only the actions that make sense for your reality.</li>
             <li><strong>Reflect and adjust</strong> after work sessions to improve future risk modeling.</li>
