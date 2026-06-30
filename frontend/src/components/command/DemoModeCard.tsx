@@ -44,7 +44,7 @@ export function DemoModeCard({ onLoadDemo }: DemoModeCardProps) {
           <div className="flex items-start gap-2 mb-4">
             <AlertCircle className="w-4 h-4 text-accent-terracotta shrink-0 mt-0.5" />
             <p className="text-xs text-text-secondary leading-relaxed font-medium">
-              This will add demo commitments to your local ChronOS workspace. It simulates a hackathon environment with a compromised timeline. It will overwrite any previous demo data.
+              This adds a sample deadline-recovery scenario to your ChronOS workspace and replaces any previous demo data.
             </p>
           </div>
           <div className="flex justify-end gap-2">

@@ -1,9 +1,17 @@
 import { useState } from 'react';
 
+export interface ReflectionPayload {
+  actual_minutes: number;
+  energy_level: number;
+  completion_status: string;
+  progress_percent_update?: number;
+  notes?: string;
+}
+
 interface ReflectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: ReflectionPayload) => Promise<void>;
   blockId: string;
 }
 
@@ -14,93 +22,110 @@ export default function ReflectionModal({ isOpen, onClose, onSubmit }: Reflectio
   const [progressUpdate, setProgressUpdate] = useState(0);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await onSubmit({
-      actual_minutes: actualMinutes,
-      energy_level: energyLevel,
-      completion_status: completionStatus,
-      progress_percent_update: progressUpdate > 0 ? progressUpdate : undefined,
-      notes: notes || undefined
-    });
-    setSubmitting(false);
+    setError(null);
+    try {
+      await onSubmit({
+        actual_minutes: actualMinutes,
+        energy_level: energyLevel,
+        completion_status: completionStatus,
+        progress_percent_update: progressUpdate > 0 ? progressUpdate : undefined,
+        notes: notes || undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ChronOS could not save this reflection.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-[#2C2B29]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#FAF9F6] rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-[#E5E0D8]">
-        <div className="px-6 py-4 border-b border-[#E5E0D8]">
-          <h2 className="text-xl font-bold text-[#2C2B29]">Focus Block Complete</h2>
-          <p className="text-sm text-[#7A7771]">Reflect on your time and update progress.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-warm-border bg-warm-ivory shadow-xl">
+        <div className="border-b border-warm-border px-6 py-4">
+          <h2 className="text-xl font-bold text-text-primary">Focus block complete</h2>
+          <p className="text-sm text-text-muted">Reflect on your time so ChronOS can adjust the plan.</p>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+          {error && (
+            <div className="rounded-lg border border-risk-atrisk bg-red-50 p-3 text-sm text-risk-atrisk">
+              {error}
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm font-medium text-[#4A4844] mb-1">Time Spent (minutes)</label>
-            <input 
-              type="number" 
+            <label className="mb-1 block text-sm font-medium text-text-secondary">Time spent in minutes</label>
+            <input
+              type="number"
+              min="0"
               value={actualMinutes}
               onChange={(e) => setActualMinutes(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-[#D1CCC2] rounded-md bg-white focus:ring-[#CC6633] focus:border-[#CC6633]"
+              className="w-full rounded-md border border-warm-border bg-white px-3 py-2 text-text-primary focus:border-accent-amber focus:outline-none focus:ring-2 focus:ring-accent-amber/30"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#4A4844] mb-1">Energy Level (1-5)</label>
-            <input 
-              type="range" 
-              min="1" max="5" 
+            <label className="mb-1 block text-sm font-medium text-text-secondary">Energy level</label>
+            <input
+              type="range"
+              min="1"
+              max="5"
               value={energyLevel}
               onChange={(e) => setEnergyLevel(Number(e.target.value))}
-              className="w-full accent-[#CC6633]"
+              className="w-full accent-accent-amber"
             />
-            <div className="flex justify-between text-xs text-[#998877] mt-1">
+            <div className="mt-1 flex justify-between text-xs text-text-muted">
               <span>Drained</span>
               <span>Energized</span>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#4A4844] mb-1">New Total Progress % (Optional)</label>
-            <input 
-              type="number" 
+            <label className="mb-1 block text-sm font-medium text-text-secondary">New total progress %</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
               placeholder="e.g. 50"
               value={progressUpdate || ''}
               onChange={(e) => setProgressUpdate(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-[#D1CCC2] rounded-md bg-white focus:ring-[#CC6633] focus:border-[#CC6633]"
+              className="w-full rounded-md border border-warm-border bg-white px-3 py-2 text-text-primary focus:border-accent-amber focus:outline-none focus:ring-2 focus:ring-accent-amber/30"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#4A4844] mb-1">Notes</label>
-            <textarea 
+            <label className="mb-1 block text-sm font-medium text-text-secondary">Notes</label>
+            <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D1CCC2] rounded-md bg-white focus:ring-[#CC6633] focus:border-[#CC6633]"
-            ></textarea>
+              className="w-full rounded-md border border-warm-border bg-white px-3 py-2 text-text-primary focus:border-accent-amber focus:outline-none focus:ring-2 focus:ring-accent-amber/30"
+            />
           </div>
 
-          <div className="flex gap-3 justify-end mt-6">
-            <button 
-              type="button" 
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 text-[#5C5A56] font-medium hover:bg-[#E5E0D8] rounded-lg transition-colors"
+              className="rounded-lg px-4 py-2 font-medium text-text-secondary transition-colors hover:bg-warm-surface disabled:opacity-50"
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-[#CC6633] text-white font-medium hover:bg-[#B35929] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+              className="rounded-lg bg-accent-amber px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-accent-terracotta disabled:opacity-50"
             >
-              {submitting ? 'Saving...' : 'Complete Block'}
+              {submitting ? 'Saving…' : 'Complete block'}
             </button>
           </div>
         </form>

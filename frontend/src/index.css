@@ -4,8 +4,7 @@
 
 @layer base {
   body {
-    background-color: #FAF6EF; /* bg-warm-ivory */
-    color: #211B16; /* text-primary */
+    @apply bg-warm-ivory text-text-primary;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }

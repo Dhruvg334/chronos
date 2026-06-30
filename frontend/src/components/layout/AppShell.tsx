@@ -8,7 +8,7 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { session, signOut } = useAuth();
 
   const navItems = [
     { label: 'Command', path: '/command' },
@@ -27,42 +27,61 @@ export default function AppShell({ children }: AppShellProps) {
           Chron<span className="text-accent-amber">OS</span>
         </Link>
         
-        {/* Oval Navbar */}
-        <nav className="bg-white border border-warm-border rounded-full px-6 py-2 shadow-sm flex flex-wrap items-center justify-center gap-4 md:gap-6">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`text-sm font-medium transition ${
-                  isActive
-                    ? 'text-accent-amber font-semibold'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Oval Navbar for protected routes */}
+        {session && (
+          <nav className="bg-white border border-warm-border rounded-full px-6 py-2 shadow-sm flex flex-wrap items-center justify-center gap-4 md:gap-6">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`text-sm font-medium transition ${
+                    isActive
+                      ? 'text-accent-amber font-semibold'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Sync indicators and User Actions */}
         <div className="flex items-center gap-4 text-xs">
           <Link to="/about" className="text-text-secondary hover:text-text-primary font-semibold transition-colors">
             Guide
           </Link>
-          <div className="flex items-center gap-1.5 text-text-secondary bg-white border border-warm-border px-3 py-1.5 rounded-full shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-risk-stable"></span>
-            Health: stable
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="flex items-center gap-1 text-text-secondary hover:text-risk-atrisk transition-colors p-1"
-            title="Log out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+
+          {session ? (
+            <>
+              <div className="flex items-center gap-1.5 text-text-secondary bg-white border border-warm-border px-3 py-1.5 rounded-full shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-risk-stable"></span>
+                Health: stable
+              </div>
+              <div className="text-text-muted font-medium truncate max-w-[120px]" title={session.user.email}>
+                {session.user.email}
+              </div>
+              <button
+                onClick={() => signOut()}
+                className="flex items-center gap-1 text-text-secondary hover:text-risk-atrisk transition-colors p-1"
+                title="Log out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-4">
+              <Link to="/login" className="text-text-secondary hover:text-text-primary font-semibold transition-colors">
+                Log in
+              </Link>
+              <Link to="/signup" className="bg-accent-amber text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-accent-terracotta transition-colors shadow-sm">
+                Sign up
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 

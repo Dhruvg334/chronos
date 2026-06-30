@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiUrl, apiFetch as fetch } from '../../lib/api';
+import { apiUrl, apiFetch as fetch, getApiErrorMessage } from '../../lib/api';
 import type { CommitmentDraft, ApproveCommitmentsRequest } from '../../types/api';
 import { CommitmentDraftCard } from './CommitmentDraftCard';
 import { AgentConsole } from '../agent/AgentConsole';
@@ -46,12 +46,12 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({ agentRunId, 
       });
 
       if (!response.ok) {
-        throw new Error("Failed to approve commitments");
+        throw new Error(await getApiErrorMessage(response, 'ChronOS could not save these commitments.'));
       }
       
       onComplete();
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ChronOS could not save these commitments.');
       setIsSubmitting(false);
     }
   };
@@ -59,14 +59,14 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({ agentRunId, 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h2 className="text-2xl font-semibold text-[#2C2B29] mb-2">Review Extracted Commitments</h2>
-        <p className="text-[#5C5A56]">We've structured your brain dump. Please review and fill in missing fields before saving.</p>
+        <h2 className="text-2xl font-semibold text-text-primary mb-2">Review extracted commitments</h2>
+        <p className="text-text-secondary">We've structured your brain dump. Please review and fill in missing fields before saving.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-4">
           {drafts.length === 0 ? (
-            <div className="p-8 text-center text-[#7A7771] border border-dashed border-[#D1CCC2] rounded-xl bg-[#FAF9F6]">
+            <div className="p-8 text-center text-text-muted border border-dashed border-warm-border rounded-xl bg-warm-ivory">
               No drafts remaining. 
             </div>
           ) : (
@@ -84,17 +84,17 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({ agentRunId, 
             <button 
               onClick={handleApproveAll}
               disabled={isSubmitting || drafts.length === 0}
-              className="bg-[#B57C45] hover:bg-[#A36A36] disabled:bg-[#D1CCC2] text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+              className="bg-accent-amber hover:bg-accent-terracotta disabled:bg-warm-border text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
             >
-              {isSubmitting ? 'Saving...' : `Approve ${drafts.length} Commitments`}
+              {isSubmitting ? 'Saving…' : `Approve ${drafts.length} commitments`}
             </button>
           </div>
-          {error && <div className="text-red-500 text-sm text-right mt-2">{error}</div>}
+          {error && <div className="text-risk-atrisk text-sm text-right mt-2">{error}</div>}
         </div>
         
         <div className="md:col-span-1">
           <div className="sticky top-6">
-            <h3 className="text-sm font-semibold text-[#5C5A56] uppercase tracking-wider mb-3">Live Agent Status</h3>
+            <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Agent status</h3>
             <AgentConsole agentRunId={agentRunId} />
           </div>
         </div>

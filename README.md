@@ -88,37 +88,49 @@ flowchart TD
 
 ## Local setup instructions
 
-1. **Clone repo**: `git clone <repo_url> && cd chronos`
-2. **Backend env vars**: Create `backend/.env` based on `backend/.env.example`. Do NOT commit this file.
-3. **Frontend env vars**: Create `frontend/.env` based on `frontend/.env.example`. Do NOT commit this file.
-4. **Supabase local start**: `supabase start --ignore-health-check` (Required due to local Logflare health quirks).
-5. **Supabase db reset**: `supabase db reset` to apply schemas and seed Vault RPCs.
-6. **Backend install/run**: 
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # or venv\Scripts\activate on Windows
-   pip install -r requirements.txt
-   uvicorn app.main:app --reload
-   ```
-7. **Frontend install/run**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-8. **Tests/Build commands**:
-   ```bash
-   # Backend
-   cd backend && python -m pytest
-   # Frontend
-   cd frontend && npm run build
-   ```
+### Supabase Setup
+Start your local Supabase instance to provision the database and Vault.
+```bash
+supabase start --ignore-health-check
+supabase db reset
+supabase status
+```
+*Note: Make sure to note your local API URL and Anon Key from the status output.*
+
+### Backend Setup
+Run the FastAPI backend.
+```bash
+cd backend
+python -m venv venv
+# Windows: .\venv\Scripts\activate
+# Mac/Linux: source venv/bin/activate
+pip install -r requirements.txt
+python -m pytest
+python -m uvicorn app.main:app --reload
+```
+*Expected local URL: `http://127.0.0.1:8000`*
+
+### Frontend Setup
+Run the Vite/React frontend.
+```bash
+cd frontend
+npm install
+npm run build
+npm run dev
+```
+*Expected local URL: `http://localhost:5173`*
+
+### Stopping the system
+To stop your local database environment:
+```bash
+supabase stop
+supabase status
+```
 
 ## Environment variables
 
-### Backend
-* `SUPABASE_URL`
+### Backend (`backend/.env`)
+* `SUPABASE_URL` (From `supabase status`)
 * `SUPABASE_ANON_KEY`
 * `SUPABASE_SERVICE_ROLE_KEY`
 * `DEV_USER_ID` (Optional fallback for local bypass)
@@ -129,12 +141,30 @@ flowchart TD
 * `GOOGLE_SCOPES`
 * `FRONTEND_URL`
 
-### Frontend
-* `VITE_API_URL`
+### Frontend (`frontend/.env`)
+* `VITE_API_URL` (e.g. `http://127.0.0.1:8000`)
 * `VITE_SUPABASE_URL`
 * `VITE_SUPABASE_ANON_KEY`
 
 > **WARNING**: Never commit `.env`, `backend/.env`, or `frontend/.env`.
+
+## Manual Test Values
+
+When running the application locally, use these manual test credentials to verify authentication and processing logic:
+
+**Signup Validation Checks:**
+* **Invalid email**: `dhruv` / Password: `Chronos123!`
+* **Weak password**: `testuser@example.com` / Password: `password`
+* **Mismatch**: Password `Chronos123!` / Confirm `Chronos456!`
+
+**Valid Signup/Login:**
+* Use a valid test email (e.g. `testuser1@example.com`)
+* Password: `Chronos123!`
+* *Wait for the verification message and check your local Supabase Inbucket for the verification link if email confirmation is enabled.*
+
+**Sample Brain Dump (Inbox):**
+Paste the following into the Inbox to test intent extraction:
+> "I need to submit my final hackathon demo by tonight 11:30 PM. I still need to record the walkthrough, fix the README, deploy the frontend, and test Google login. I also have a college assignment due tomorrow morning and a team call at 8 PM."
 
 ## Auth setup notes
 To use authentication locally or in production, configure your Supabase Dashboard:

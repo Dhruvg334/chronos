@@ -1,6 +1,8 @@
 import React from 'react';
 import type { CommitmentDraft } from '../../types/api';
 
+type DraftFieldValue = string | number | null;
+
 interface CommitmentDraftCardProps {
   draft: CommitmentDraft;
   onUpdate: (updatedDraft: CommitmentDraft) => void;
@@ -8,103 +10,112 @@ interface CommitmentDraftCardProps {
 }
 
 export const CommitmentDraftCard: React.FC<CommitmentDraftCardProps> = ({ draft, onUpdate, onReject }) => {
-  const handleChange = (field: keyof CommitmentDraft, value: any) => {
+  const handleChange = (field: keyof CommitmentDraft, value: DraftFieldValue) => {
     onUpdate({ ...draft, [field]: value });
   };
 
   const hasMissing = draft.missing_fields && draft.missing_fields.length > 0;
 
+  const confidenceClass =
+    draft.confidence_score > 0.8
+      ? 'bg-green-50 text-risk-stable'
+      : draft.confidence_score > 0.5
+        ? 'bg-warm-cream text-risk-watch'
+        : 'bg-red-50 text-risk-atrisk';
+
   return (
-    <div className="bg-[#FAF9F6] border border-[#E5E0D8] rounded-xl p-5 shadow-sm mb-4">
-      <div className="flex justify-between items-start mb-3">
+    <div className="mb-4 rounded-xl border border-warm-border bg-warm-ivory p-5 shadow-sm">
+      <div className="mb-3 flex items-start justify-between">
         <div className="flex-1">
           <input
-            className="text-xl font-semibold text-[#2C2B29] bg-transparent border-b border-transparent hover:border-[#D1CCC2] focus:border-[#B57C45] focus:outline-none w-full transition-colors"
+            className="w-full border-b border-transparent bg-transparent text-xl font-semibold text-text-primary transition-colors hover:border-warm-border focus:border-accent-amber focus:outline-none"
             value={draft.title}
             onChange={(e) => handleChange('title', e.target.value)}
           />
-          <div className="flex gap-2 mt-2 items-center text-xs">
-            <span className="px-2 py-1 bg-[#F0EBE1] text-[#5C5A56] rounded-md font-medium uppercase tracking-wider">
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <span className="rounded-md bg-warm-surface px-2 py-1 font-medium uppercase tracking-wider text-text-secondary">
               {draft.type}
             </span>
-            <span className={`px-2 py-1 rounded-md font-medium ${
-              draft.confidence_score > 0.8 ? 'bg-[#EAF3EA] text-[#3D663D]' : 
-              draft.confidence_score > 0.5 ? 'bg-[#FDF3E1] text-[#997328]' : 'bg-[#FBEAEA] text-[#993333]'
-            }`}>
-              {Math.round(draft.confidence_score * 100)}% Match
+            <span className={`rounded-md px-2 py-1 font-medium ${confidenceClass}`}>
+              {Math.round(draft.confidence_score * 100)}% match
             </span>
           </div>
         </div>
-        <button 
+        <button
           onClick={onReject}
-          className="text-[#998877] hover:text-[#993333] transition-colors p-1"
-          title="Reject Commitment"
+          className="p-1 text-text-muted transition-colors hover:text-risk-atrisk"
+          title="Reject commitment"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 my-4">
+      <div className="my-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-[#7A7771] mb-1">Estimated Minutes</label>
+          <label className="mb-1 block text-xs font-medium text-text-muted">Estimated minutes</label>
           <input
             type="number"
-            className="w-full p-2 rounded bg-white border border-[#E5E0D8] text-[#2C2B29] focus:ring-1 focus:ring-[#B57C45] focus:outline-none"
+            min="0"
+            className="w-full rounded border border-warm-border bg-white p-2 text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-amber"
             value={draft.estimated_minutes || ''}
             placeholder="e.g. 60"
-            onChange={(e) => handleChange('estimated_minutes', e.target.value ? parseInt(e.target.value) : null)}
+            onChange={(e) => handleChange('estimated_minutes', e.target.value ? parseInt(e.target.value, 10) : null)}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[#7A7771] mb-1">Deadline (UTC)</label>
+          <label className="mb-1 block text-xs font-medium text-text-muted">Deadline</label>
           <input
             type="datetime-local"
-            className="w-full p-2 rounded bg-white border border-[#E5E0D8] text-[#2C2B29] focus:ring-1 focus:ring-[#B57C45] focus:outline-none"
+            className="w-full rounded border border-warm-border bg-white p-2 text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-amber"
             value={draft.deadline_at ? draft.deadline_at.slice(0, 16) : ''}
             onChange={(e) => handleChange('deadline_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[#7A7771] mb-1">Importance (1-5)</label>
+          <label className="mb-1 block text-xs font-medium text-text-muted">Importance</label>
           <input
-            type="range" min="1" max="5"
-            className="w-full accent-[#B57C45]"
+            type="range"
+            min="1"
+            max="5"
+            className="w-full accent-accent-amber"
             value={draft.importance}
-            onChange={(e) => handleChange('importance', parseInt(e.target.value))}
+            onChange={(e) => handleChange('importance', parseInt(e.target.value, 10))}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[#7A7771] mb-1">Flexibility (1-5)</label>
+          <label className="mb-1 block text-xs font-medium text-text-muted">Flexibility</label>
           <input
-            type="range" min="1" max="5"
-            className="w-full accent-[#B57C45]"
+            type="range"
+            min="1"
+            max="5"
+            className="w-full accent-accent-amber"
             value={draft.flexibility}
-            onChange={(e) => handleChange('flexibility', parseInt(e.target.value))}
+            onChange={(e) => handleChange('flexibility', parseInt(e.target.value, 10))}
           />
         </div>
       </div>
 
       {hasMissing && (
-        <div className="bg-[#FDF8EE] border border-[#F2DEB6] text-[#997328] p-3 rounded-lg text-sm flex items-start gap-2 mb-4">
-          <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-warm-border bg-warm-cream p-3 text-sm text-risk-watch">
+          <svg className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <div>
-            <strong>Missing context:</strong> Please fill in {draft.missing_fields.join(', ')} for better planning.
+            <strong>Missing context:</strong> Add {draft.missing_fields.join(', ')} to improve planning quality.
           </div>
         </div>
       )}
 
       {(draft.tasks?.length ?? 0) > 0 && (
-        <div className="mt-4 border-t border-[#E5E0D8] pt-3">
-          <label className="block text-xs font-medium text-[#7A7771] mb-2">Detected Tasks</label>
+        <div className="mt-4 border-t border-warm-border pt-3">
+          <label className="mb-2 block text-xs font-medium text-text-muted">Detected tasks</label>
           <ul className="space-y-1">
             {draft.tasks.map((task, idx) => (
-              <li key={idx} className="text-sm text-[#4A4844] flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#B57C45]"></span>
-                {task.title} {task.estimated_minutes ? <span className="text-xs text-[#998877]">({task.estimated_minutes}m)</span> : ''}
+              <li key={idx} className="flex items-center gap-2 text-sm text-text-secondary">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent-amber" />
+                {task.title} {task.estimated_minutes ? <span className="text-xs text-text-muted">({task.estimated_minutes}m)</span> : ''}
               </li>
             ))}
           </ul>

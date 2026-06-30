@@ -1,9 +1,14 @@
 import { useState } from 'react';
 
+export interface SkipPayload {
+  reason: string;
+  notes?: string;
+}
+
 interface SkipModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: SkipPayload) => Promise<void>;
   blockId: string;
 }
 
@@ -11,67 +16,80 @@ export default function SkipModal({ isOpen, onClose, onSubmit }: SkipModalProps)
   const [reason, setReason] = useState('blocked');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await onSubmit({
-      reason,
-      notes: notes || undefined
-    });
-    setSubmitting(false);
+    setError(null);
+    try {
+      await onSubmit({
+        reason,
+        notes: notes || undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ChronOS could not skip this focus block.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-[#2C2B29]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#FAF9F6] rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-[#E5E0D8]">
-        <div className="px-6 py-4 border-b border-[#E5E0D8]">
-          <h2 className="text-xl font-bold text-[#2C2B29]">Skip Focus Block</h2>
-          <p className="text-sm text-[#7A7771]">Skipping applies a small penalty to the risk score.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-warm-border bg-warm-ivory shadow-xl">
+        <div className="border-b border-warm-border px-6 py-4">
+          <h2 className="text-xl font-bold text-text-primary">Skip focus block</h2>
+          <p className="text-sm text-text-muted">Skipping updates risk so the plan stays honest.</p>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+          {error && (
+            <div className="rounded-lg border border-risk-atrisk bg-red-50 p-3 text-sm text-risk-atrisk">
+              {error}
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm font-medium text-[#4A4844] mb-1">Reason</label>
-            <select 
+            <label className="mb-1 block text-sm font-medium text-text-secondary">Reason</label>
+            <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D1CCC2] rounded-md bg-white focus:ring-[#CC6633] focus:border-[#CC6633]"
+              className="w-full rounded-md border border-warm-border bg-white px-3 py-2 text-text-primary focus:border-accent-amber focus:outline-none focus:ring-2 focus:ring-accent-amber/30"
             >
               <option value="blocked">Blocked</option>
               <option value="interrupted">Interrupted</option>
-              <option value="low_energy">Low Energy</option>
+              <option value="low_energy">Low energy</option>
               <option value="postponed">Postponed</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#4A4844] mb-1">Details (Optional)</label>
-            <textarea 
+            <label className="mb-1 block text-sm font-medium text-text-secondary">Details</label>
+            <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D1CCC2] rounded-md bg-white focus:ring-[#CC6633] focus:border-[#CC6633]"
-            ></textarea>
+              className="w-full rounded-md border border-warm-border bg-white px-3 py-2 text-text-primary focus:border-accent-amber focus:outline-none focus:ring-2 focus:ring-accent-amber/30"
+            />
           </div>
 
-          <div className="flex gap-3 justify-end mt-6">
-            <button 
-              type="button" 
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 text-[#5C5A56] font-medium hover:bg-[#E5E0D8] rounded-lg transition-colors"
+              className="rounded-lg px-4 py-2 font-medium text-text-secondary transition-colors hover:bg-warm-surface disabled:opacity-50"
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-[#993333] text-white font-medium hover:bg-[#802B2B] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+              className="rounded-lg bg-risk-atrisk px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-risk-critical disabled:opacity-50"
             >
-              {submitting ? 'Skipping...' : 'Skip Block'}
+              {submitting ? 'Skipping…' : 'Skip block'}
             </button>
           </div>
         </form>

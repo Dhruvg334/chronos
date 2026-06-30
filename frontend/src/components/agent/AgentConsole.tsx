@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { apiUrl, apiFetch as fetch } from '../../lib/api';
+import React, { useEffect, useState } from 'react';
+import { apiFetch, apiUrl } from '../../lib/api';
 import type { AgentTraceEvent } from '../../types/api';
 
 interface AgentConsoleProps {
@@ -8,6 +8,7 @@ interface AgentConsoleProps {
 
 export const AgentConsole: React.FC<AgentConsoleProps> = ({ agentRunId }) => {
   const [traces, setTraces] = useState<AgentTraceEvent[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!agentRunId) return;
@@ -16,13 +17,15 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ agentRunId }) => {
 
     const pollTraces = async () => {
       try {
-        const response = await fetch(apiUrl(`/api/v1/agent/runs/${agentRunId}/trace`));
-        if (response.ok) {
-          const data = await response.json();
-          if (!cancelled) setTraces(Array.isArray(data.events) ? data.events : []);
+        const response = await apiFetch(apiUrl(`/api/v1/agent/runs/${agentRunId}/trace`));
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled) {
+          setTraces(Array.isArray(data.events) ? data.events : []);
+          setError(null);
         }
-      } catch (error) {
-        console.error('Error polling traces', error);
+      } catch {
+        if (!cancelled) setError('Trace updates are temporarily unavailable.');
       }
     };
 
@@ -38,31 +41,32 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({ agentRunId }) => {
   if (!agentRunId) return null;
 
   const statusClass = (status: string) => {
-    if (status === 'failed') return 'text-red-400';
-    if (status === 'succeeded' || status === 'completed') return 'text-green-400';
-    return 'text-stone-300';
+    if (status === 'failed') return 'text-risk-atrisk';
+    if (status === 'succeeded' || status === 'completed') return 'text-risk-stable';
+    return 'text-text-muted';
   };
 
   return (
-    <div className="bg-stone-900 text-stone-300 font-mono text-sm p-4 rounded-lg shadow-inner max-h-64 overflow-y-auto w-full">
-      <div className="text-amber-500 mb-2 font-bold flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-        Agent Trace: {agentRunId.slice(0, 8)}...
+    <div className="max-h-64 w-full overflow-y-auto rounded-lg border border-warm-border bg-white p-4 text-sm shadow-inner">
+      <div className="mb-2 flex items-center gap-2 font-bold text-accent-amber">
+        <span className="h-2 w-2 rounded-full bg-accent-amber" />
+        Agent trace {agentRunId.slice(0, 8)}
       </div>
+      {error && <div className="mb-2 text-xs text-risk-atrisk">{error}</div>}
       <div className="space-y-1">
         {traces.length === 0 ? (
-          <div className="text-stone-500 italic">Waiting for backend trace events...</div>
+          <div className="text-text-muted italic">Waiting for trace events…</div>
         ) : (
           traces.map(trace => (
-            <div key={trace.id} className="border-l-2 border-stone-700 pl-3 py-1">
-              <div className="flex gap-3 items-center">
-                <span className="text-stone-500 shrink-0">
+            <div key={trace.id} className="border-l-2 border-warm-border py-1 pl-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="shrink-0 text-text-muted">
                   {new Date(trace.created_at).toLocaleTimeString([], { hour12: false })}
                 </span>
                 <span className={statusClass(trace.status)}>{trace.step_name}</span>
-                <span className="text-stone-500 text-xs">{trace.status}</span>
+                <span className="text-xs text-text-muted">{trace.status}</span>
               </div>
-              {trace.explanation && <div className="text-stone-400 text-xs mt-0.5">{trace.explanation}</div>}
+              {trace.explanation && <div className="mt-0.5 text-xs text-text-secondary">{trace.explanation}</div>}
             </div>
           ))
         )}

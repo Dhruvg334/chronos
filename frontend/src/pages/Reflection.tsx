@@ -3,7 +3,7 @@ import AppShell from '../components/layout/AppShell';
 export default function Reflection() {
   return (
     <AppShell>
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <h2 className="text-3xl font-extrabold mb-2">Reflection & Calibration</h2>
         <p className="text-text-secondary mb-6">
           Review your performance logs to calibrate estimate-vs-actual coefficients in memory.

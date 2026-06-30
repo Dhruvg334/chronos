@@ -3,7 +3,7 @@ import AppShell from '../components/layout/AppShell';
 export default function Rescue() {
   return (
     <AppShell>
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <h2 className="text-3xl font-extrabold text-risk-critical mb-2">Rescue Console</h2>
         <p className="text-text-secondary mb-6">
           Minimum Viable Completion Paths (MVCP) for near-failing commitments.

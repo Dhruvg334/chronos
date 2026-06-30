@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Play, Check, SkipForward, AlertCircle, Clock, CheckCircle2, Circle } from 'lucide-react';
-import { apiUrl, apiFetch as fetch } from '../lib/api';
+import { apiUrl, apiFetch as fetch, getApiErrorMessage } from '../lib/api';
 import AppShell from '../components/layout/AppShell';
-import ReflectionModal from '../components/command/ReflectionModal';
-import SkipModal from '../components/command/SkipModal';
+import ReflectionModal, { type ReflectionPayload } from '../components/command/ReflectionModal';
+import SkipModal, { type SkipPayload } from '../components/command/SkipModal';
 import { CalendarConnection } from '../components/command/CalendarConnection';
 import DecisionDock from '../components/command/DecisionDock';
 import { CommandHero } from '../components/command/CommandHero';
@@ -12,6 +12,10 @@ import { DemoModeCard } from '../components/command/DemoModeCard';
 import { EmptyState } from '../components/command/EmptyState';
 import { InfoHint } from '../components/ui/InfoHint';
 import type { SavedCommitment, CommitmentDetailResponse, NormalizedTimeSpineStage } from '../types/api';
+
+interface RescueCandidate extends SavedCommitment {
+  _rescue_reason?: string;
+}
 
 export default function Command() {
   const [commitments, setCommitments] = useState<SavedCommitment[]>([]);
@@ -27,14 +31,21 @@ export default function Command() {
   const [creatingBlock, setCreatingBlock] = useState(false);
   const [dockKey, setDockKey] = useState(0);
 
-  const [rescueCandidates, setRescueCandidates] = useState<any[]>([]);
+  const [rescueCandidates, setRescueCandidates] = useState<RescueCandidate[]>([]);
   const [runningRescue, setRunningRescue] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const refreshAll = async () => {
     await fetchCommitments();
     await fetchRescueCandidates();
     if (selectedId) await fetchDetail(selectedId);
     setDockKey(prev => prev + 1);
+  };
+
+  const showActionMessage = (message: string) => {
+    setActionMessage(message);
+    window.setTimeout(() => setActionMessage(null), 4000);
   };
 
   const fetchCommitments = async () => {
@@ -46,8 +57,8 @@ export default function Command() {
       if (data.length > 0 && !selectedId) {
         setSelectedId(data[0].id);
       }
-    } catch (err: any) {
-      console.error(err.message || 'Unable to load commitments');
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : 'Unable to load commitments.');
     } finally {
       setLoadingList(false);
     }
@@ -60,8 +71,8 @@ export default function Command() {
       if (!res.ok) throw new Error('Failed to load commitment detail');
       const data = await res.json();
       setDetail(data);
-    } catch (err: any) {
-      console.error(err);
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : 'Unable to load commitment details.');
     } finally {
       setLoadingDetail(false);
     }
@@ -70,40 +81,47 @@ export default function Command() {
   const fetchRescueCandidates = async () => {
     try {
       const res = await fetch(apiUrl('/api/v1/rescue/candidates'));
-      if (res.ok) {
-        const data = await res.json();
-        setRescueCandidates(data.candidates || []);
-      }
-    } catch (err) {
-      console.error(err);
+      if (!res.ok) return;
+      const data = await res.json();
+      setRescueCandidates(data.candidates || []);
+    } catch {
+      setRescueCandidates([]);
     }
   };
 
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
+    setPageError(null);
     try {
-      await fetch(apiUrl('/api/v1/scheduling/plan'), { method: 'POST' });
-      const res = await fetch(apiUrl('/api/v1/command/analyze'), { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setBrief(data);
+      const planRes = await fetch(apiUrl('/api/v1/scheduling/plan'), { method: 'POST' });
+      if (!planRes.ok) {
+        throw new Error(await getApiErrorMessage(planRes, 'ChronOS could not prepare schedule suggestions.'));
       }
+
+      const res = await fetch(apiUrl('/api/v1/command/analyze'), { method: 'POST' });
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not analyze your plan.'));
+      }
+
+      setBrief(await res.json());
       await refreshAll();
+      showActionMessage('Analysis complete. Suggestions are ready for review.');
     } catch (err) {
-      console.error(err);
+      setPageError(err instanceof Error ? err.message : 'ChronOS could not analyze your plan.');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const handleLoadDemo = async () => {
-    try {
-      await fetch(apiUrl('/api/v1/demo/load'), { method: 'POST' });
-      await refreshAll();
-      setBrief(null);
-    } catch (err) {
-      console.error(err);
+    setPageError(null);
+    const res = await fetch(apiUrl('/api/v1/demo/load'), { method: 'POST' });
+    if (!res.ok) {
+      throw new Error(await getApiErrorMessage(res, 'ChronOS could not load the demo scenario.'));
     }
+    await refreshAll();
+    setBrief(null);
+    showActionMessage('Demo scenario loaded. Run analysis to review the recovery plan.');
   };
 
   const handleRunRescue = async (cid: string) => {
@@ -114,7 +132,7 @@ export default function Command() {
         await refreshAll();
       }
     } catch (err) {
-      console.error(err);
+      setPageError(err instanceof Error ? err.message : 'ChronOS could not prepare rescue options.');
     } finally {
       setRunningRescue(null);
     }
@@ -148,11 +166,13 @@ export default function Command() {
           block_type: 'deep_work'
         })
       });
-      if (res.ok) {
-        await fetchDetail(detail.id);
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not create a focus block.'));
       }
+      await fetchDetail(detail.id);
+      showActionMessage('Focus block created.');
     } catch (err) {
-      console.error(err);
+      setPageError(err instanceof Error ? err.message : 'ChronOS could not create a focus block.');
     } finally {
       setCreatingBlock(false);
     }
@@ -161,15 +181,16 @@ export default function Command() {
   const handleStartBlock = async (blockId: string) => {
     try {
       const res = await fetch(apiUrl(`/api/v1/focus-blocks/${blockId}/start`), { method: 'POST' });
-      if (res.ok && detail) {
-        fetchDetail(detail.id);
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not start the focus block.'));
       }
+      if (detail) fetchDetail(detail.id);
     } catch (err) {
-      console.error(err);
+      setPageError(err instanceof Error ? err.message : 'ChronOS could not start the focus block.');
     }
   };
 
-  const handleCompleteBlock = async (data: any) => {
+  const handleCompleteBlock = async (data: ReflectionPayload) => {
     if (!reflectionBlockId || !detail) return;
     try {
       const res = await fetch(apiUrl(`/api/v1/focus-blocks/${reflectionBlockId}/complete`), {
@@ -177,16 +198,18 @@ export default function Command() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (res.ok) {
-        setReflectionBlockId(null);
-        await refreshAll();
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not complete the focus block.'));
       }
+      setReflectionBlockId(null);
+      await refreshAll();
+      showActionMessage('Focus block completed and risk updated.');
     } catch (err) {
-      console.error(err);
+      setPageError(err instanceof Error ? err.message : 'ChronOS could not complete the focus block.');
     }
   };
 
-  const handleSkipBlock = async (data: any) => {
+  const handleSkipBlock = async (data: SkipPayload) => {
     if (!skipBlockId || !detail) return;
     try {
       const res = await fetch(apiUrl(`/api/v1/focus-blocks/${skipBlockId}/skip`), {
@@ -194,12 +217,14 @@ export default function Command() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (res.ok) {
-        setSkipBlockId(null);
-        await refreshAll();
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not skip the focus block.'));
       }
+      setSkipBlockId(null);
+      await refreshAll();
+      showActionMessage('Focus block skipped and timeline updated.');
     } catch (err) {
-      console.error(err);
+      setPageError(err instanceof Error ? err.message : 'ChronOS could not skip the focus block.');
     }
   };
 
@@ -216,13 +241,24 @@ export default function Command() {
 
   return (
     <AppShell>
-      {/* max-w-5xl for wider layout to fix text truncation */}
-      <div className="flex flex-col h-full overflow-y-auto pr-2 pb-12 max-w-5xl mx-auto">
+      <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-y-auto px-4 pb-12 sm:px-6 lg:px-8">
         <CommandHero onAnalyze={handleRunAnalysis} isAnalyzing={isAnalyzing} />
+
+        {pageError && (
+          <div className="mb-4 rounded-xl border border-risk-atrisk bg-red-50 px-4 py-3 text-sm text-risk-atrisk">
+            {pageError}
+          </div>
+        )}
+
+        {actionMessage && (
+          <div className="mb-4 rounded-xl border border-risk-stable bg-green-50 px-4 py-3 text-sm text-risk-stable">
+            {actionMessage}
+          </div>
+        )}
         
         {commitments.length === 0 && !loadingList ? (
           <EmptyState onLoadDemo={async () => {
-            if (window.confirm("This will add demo commitments to your local ChronOS workspace. It simulates a hackathon environment with a compromised timeline. It will overwrite any previous demo data. Proceed?")) {
+            if (window.confirm("This will add a sample deadline-recovery scenario to your ChronOS workspace and replace any previous demo data. Proceed?")) {
               await handleLoadDemo();
             }
           }} />
@@ -253,29 +289,24 @@ export default function Command() {
               </div>
             )}
 
-            {/* Divider */}
             <hr className="border-warm-border my-8" />
 
-            {/* Main Detail Canvas */}
-            <div className="w-full flex flex-col gap-6">
+            <div className="w-full flex flex-col md:flex-row gap-6">
               {!detail ? (
                 <div className="flex-1 flex items-center justify-center text-text-muted bg-warm-ivory rounded-xl border border-warm-border border-dashed min-h-[200px]">
                   {loadingDetail ? 'Loading details...' : 'Select a commitment below to view its canvas'}
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* Execution Workspace */}
-                  <div className="bg-white border border-warm-border rounded-xl p-6 shadow-sm flex flex-col">
-                    <div className="flex justify-between items-start mb-6">
-                      <div>
-                        <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
-                          <Play className="w-5 h-5 text-accent-amber" />
-                          Execution Workspace
-                        </h3>
-                      </div>
-                      <div className="text-right">
-                        <h4 className="font-bold text-text-primary truncate max-w-[200px]" title={detail.title}>{detail.title}</h4>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${getRiskColor(detail.risk_level)}`}>
+                <>
+                  <div className="flex-1 bg-white border border-warm-border rounded-xl p-6 shadow-sm flex flex-col">
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <h3 className="flex shrink-0 items-center gap-2 text-lg font-bold text-text-primary">
+                        <Play className="h-5 w-5 text-accent-amber" />
+                        Execution Workspace
+                      </h3>
+                      <div className="min-w-0 flex-1 sm:text-right sm:pl-4">
+                        <h4 className="break-words font-bold leading-snug text-text-primary" title={detail.title}>{detail.title}</h4>
+                        <span className={`mt-1 inline-flex rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getRiskColor(detail.risk_level)}`}>
                           {detail.risk_level.replace('_', ' ')}
                         </span>
                       </div>
@@ -337,14 +368,13 @@ export default function Command() {
                     </div>
                   </div>
 
-                  {/* Time Spine */}
-                  <div className="bg-white border border-warm-border rounded-xl p-6 shadow-sm">
+                  <div className="md:w-1/3 shrink-0 bg-white border border-warm-border rounded-xl p-6 shadow-sm">
                     <h3 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-risk-stable" />
                       Time Spine
                       <InfoHint content="The staged execution path ChronOS builds from intention to completion." />
                     </h3>
-                    <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2">
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                       {detail.time_spine_stages.length === 0 ? (
                         <div className="text-text-muted text-sm bg-white p-4 rounded-lg border border-warm-border">No spine generated yet.</div>
                       ) : (
@@ -375,14 +405,12 @@ export default function Command() {
                       )}
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 
-            {/* Divider */}
             <hr className="border-warm-border my-8" />
 
-            {/* Lower Priority Sections */}
             <div className="space-y-8">
               <div>
                 <h3 className="text-lg font-bold text-text-primary mb-4">Other Commitments</h3>
@@ -394,7 +422,7 @@ export default function Command() {
                       className="p-4 rounded-xl cursor-pointer transition-all border bg-white border-warm-border hover:border-text-muted hover:shadow-sm"
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold text-sm text-text-primary truncate pr-2">{c.title}</h4>
+                        <h4 className="pr-2 text-sm font-semibold leading-snug text-text-primary">{c.title}</h4>
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap ${getRiskColor(c.risk_level)}`}>
                           {c.risk_level.replace('_', ' ')}
                         </span>

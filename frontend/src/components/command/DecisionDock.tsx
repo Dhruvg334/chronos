@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, X, Zap, ChevronDown, ChevronUp } from 'lucide-react';
-import { apiUrl, apiFetch as fetch } from '../../lib/api';
+import { apiUrl, apiFetch as fetch, getApiErrorMessage } from '../../lib/api';
 import { InfoHint } from '../ui/InfoHint';
 
 interface Proposal {
@@ -50,8 +50,11 @@ export default function DecisionDock({ onRefresh }: { onRefresh: () => void }) {
       }
       
       setProposals(allProposals);
-    } catch (err: any) {
-      setError(err.message);
+      if (!schedRes.ok && !rescueRes.ok) {
+        setError('ChronOS could not load suggested actions.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ChronOS could not load suggested actions.');
     } finally {
       setLoading(false);
     }
@@ -66,11 +69,14 @@ export default function DecisionDock({ onRefresh }: { onRefresh: () => void }) {
       const path = actionType === 'commitment_rescue' 
         ? `/api/v1/rescue/proposals/${id}/approve`
         : `/api/v1/scheduling/proposals/${id}/approve`;
-      await fetch(apiUrl(path), { method: 'POST' });
+      const res = await fetch(apiUrl(path), { method: 'POST' });
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not approve this suggestion.'));
+      }
       await fetchProposals();
       onRefresh();
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'ChronOS could not approve this suggestion.');
     }
   };
 
@@ -79,31 +85,43 @@ export default function DecisionDock({ onRefresh }: { onRefresh: () => void }) {
       const path = actionType === 'commitment_rescue' 
         ? `/api/v1/rescue/proposals/${id}/reject`
         : `/api/v1/scheduling/proposals/${id}/reject`;
-      await fetch(apiUrl(path), { method: 'POST' });
+      const res = await fetch(apiUrl(path), { method: 'POST' });
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not reject this suggestion.'));
+      }
       await fetchProposals();
+      onRefresh();
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'ChronOS could not reject this suggestion.');
     }
   };
 
   const handleApproveAll = async () => {
     try {
-      await fetch(apiUrl('/api/v1/scheduling/proposals/approve-all'), { method: 'POST' });
+      const res = await fetch(apiUrl('/api/v1/scheduling/proposals/approve-all'), { method: 'POST' });
+      if (!res.ok) {
+        throw new Error(await getApiErrorMessage(res, 'ChronOS could not approve all schedule suggestions.'));
+      }
       await fetchProposals();
       onRefresh();
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'ChronOS could not approve all schedule suggestions.');
     }
   };
 
-  if (loading) return <div className="text-sm text-text-muted">Loading proposals...</div>;
-  if (error) return <div className="text-sm text-risk-critical">{error}</div>;
-  if (proposals.length === 0) return null; // Hide dock if nothing pending
+  if (loading) return <div className="rounded-xl border border-warm-border bg-warm-cream p-4 text-sm text-text-muted">Loading suggestions…</div>;
+  if (error) {
+    return (
+      <div className="mb-8 rounded-xl border border-risk-atrisk bg-red-50 p-4 text-sm text-risk-atrisk">
+        {error}
+      </div>
+    );
+  }
+  if (proposals.length === 0) return null;
 
   const numRescue = proposals.filter(p => p.action_type === 'commitment_rescue').length;
   const numFocus = proposals.length - numRescue;
 
-  // Group proposals by commitment title
   const groupedProposals = proposals.reduce((acc, p) => {
     const title = p.payload_json.title;
     if (!acc[title]) acc[title] = [];
@@ -113,7 +131,6 @@ export default function DecisionDock({ onRefresh }: { onRefresh: () => void }) {
 
   return (
     <div className="bg-warm-cream border border-warm-border rounded-xl p-6 shadow-sm mb-8">
-      {/* Summary View */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
@@ -144,7 +161,6 @@ export default function DecisionDock({ onRefresh }: { onRefresh: () => void }) {
         </div>
       </div>
 
-      {/* Expanded View */}
       {expanded && (
         <div className="mt-6 space-y-6 border-t border-warm-border pt-6">
           {Object.entries(groupedProposals).map(([title, groupProposals]) => (
@@ -165,17 +181,17 @@ export default function DecisionDock({ onRefresh }: { onRefresh: () => void }) {
                         </div>
                         
                         {isRescue ? (
-                          <div className="text-xs text-text-secondary truncate">
-                            {payload.reason}
+                          <div className="text-xs leading-relaxed text-text-secondary">
+                            {payload.reason || 'ChronOS recommends this recovery action based on deadline risk.'}
                           </div>
                         ) : (
-                          <div className="text-xs text-text-secondary flex items-center gap-1.5 truncate">
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs leading-relaxed text-text-secondary">
                             {payload.start_at && new Date(payload.start_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} 
                             {' '}to{' '} 
                             {payload.end_at && new Date(payload.end_at).toLocaleTimeString([], { timeStyle: 'short' })} 
                             {' '}({payload.duration_minutes}m)
                             <span className="text-warm-border mx-1">|</span>
-                            <span className="truncate">{p.explanation}</span>
+                            <span className="min-w-0">{p.explanation}</span>
                           </div>
                         )}
                       </div>

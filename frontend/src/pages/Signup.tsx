@@ -62,8 +62,8 @@ export default function Signup() {
       }
 
       setIsSuccess(true);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during sign up.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create your account.');
     } finally {
       setIsLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -13,11 +13,11 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // If already logged in, redirect to command
-  if (session) {
-    navigate('/command');
-    return null;
-  }
+  useEffect(() => {
+    if (session) navigate('/command');
+  }, [session, navigate]);
+
+  if (session) return null;
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,8 +41,8 @@ export default function Login() {
       
       // onAuthStateChange in AuthProvider will handle the redirect
       navigate('/command');
-    } catch (err: any) {
-      setError('Invalid login credentials or email not verified.');
+    } catch {
+      setError('Invalid credentials or email not verified.');
     } finally {
       setIsLoading(false);
     }
@@ -52,16 +52,26 @@ export default function Login() {
     setError(null);
     setIsGoogleLoading(true);
     try {
-      const { error: googleError } = await supabase.auth.signInWithOAuth({
+      const { data, error: googleError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/command`
         }
       });
       
-      if (googleError) throw googleError;
+      if (googleError) {
+        throw googleError;
+      }
+      
+      if (!data || !data.url) {
+        throw new Error('Google login provider is not configured correctly in Supabase.');
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to initialize Google Login.');
+      setError(
+        err.message?.includes('provider is not supported') 
+          ? 'Google login is not currently configured in this environment.'
+          : err.message || 'Failed to initialize Google Login. Please ensure the provider is configured.'
+      );
       setIsGoogleLoading(false);
     }
   };
