@@ -2,9 +2,7 @@ from typing import Dict, Any, List
 from datetime import datetime, timezone
 import logging
 
-from postgrest.exceptions import APIError
-
-from app.core.database import supabase_client
+from app.repositories.protocols import CommitmentsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +44,7 @@ def _empty_time_spine_view() -> Dict[str, Any]:
     return {"stages": [], "current_stage": None}
 
 
-def get_time_spine_view(commitment_id: str, user_id: str) -> Dict[str, Any]:
+def get_time_spine_view(commitment_id: str, user_id: str, repository: CommitmentsRepository) -> Dict[str, Any]:
     """
     Fetch and normalize a commitment time spine.
 
@@ -55,41 +53,21 @@ def get_time_spine_view(commitment_id: str, user_id: str) -> Dict[str, Any]:
     non-UUID placeholder commitment id. In those cases, return an empty spine
     view instead of crashing the focus/reflection lifecycle.
     """
-    if not supabase_client:
-        return _empty_time_spine_view()
-
     try:
-        spine_res = (
-            supabase_client.table("time_spines")
-            .select("*")
-            .eq("commitment_id", commitment_id)
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-        )
-    except APIError as exc:
+        spine = repository.get_time_spine(user_id, commitment_id)
+    except Exception as exc:
         logger.warning("Unable to fetch time spine for commitment %s: %s", commitment_id, exc)
         return _empty_time_spine_view()
-
-    if not spine_res.data:
+    if not spine:
         return _empty_time_spine_view()
-
     try:
-        comm_res = (
-            supabase_client.table("commitments")
-            .select("risk_level")
-            .eq("id", commitment_id)
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-        )
-        risk_level = comm_res.data.get("risk_level") if comm_res.data else "stable"
-    except APIError as exc:
+        commitment = repository.get_for_user(user_id, commitment_id)
+        risk_level = commitment.get("risk_level", "stable") if commitment else "stable"
+    except Exception as exc:
         logger.warning("Unable to fetch risk level for commitment %s: %s", commitment_id, exc)
         risk_level = "stable"
-
-    spine_json = spine_res.data.get("spine_json") or []
-    current_stage = spine_res.data.get("current_stage")
+    spine_json = spine.get("spine_json") or []
+    current_stage = spine.get("current_stage")
 
     return {
         "stages": normalize_spine_json(spine_json, current_stage, risk_level),
@@ -97,28 +75,15 @@ def get_time_spine_view(commitment_id: str, user_id: str) -> Dict[str, Any]:
     }
 
 
-def advance_time_spine_stage(commitment_id: str, user_id: str, event_type: str = "progress") -> None:
+def advance_time_spine_stage(commitment_id: str, user_id: str, repository: CommitmentsRepository, event_type: str = "progress") -> None:
     """Advance the current stage when possible; never break the parent operation."""
-    if not supabase_client:
-        return
-
     try:
-        spine_res = (
-            supabase_client.table("time_spines")
-            .select("*")
-            .eq("commitment_id", commitment_id)
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-        )
-    except APIError as exc:
+        spine = repository.get_time_spine(user_id, commitment_id)
+    except Exception as exc:
         logger.warning("Unable to advance time spine for commitment %s: %s", commitment_id, exc)
         return
-
-    if not spine_res.data:
+    if not spine:
         return
-
-    spine = spine_res.data
     spine_json = spine.get("spine_json") or []
     current_stage = spine.get("current_stage")
 
@@ -136,13 +101,7 @@ def advance_time_spine_stage(commitment_id: str, user_id: str, event_type: str =
 
     if found and next_stage != current_stage:
         try:
-            (
-                supabase_client.table("time_spines")
-                .update({"current_stage": next_stage, "spine_json": spine_json})
-                .eq("id", spine["id"])
-                .eq("user_id", user_id)
-                .execute()
-            )
+            repository.update_time_spine(user_id, commitment_id, {"current_stage": next_stage, "spine_json": spine_json})
             logger.info("Advanced time spine for commitment %s to stage %s", commitment_id, next_stage)
-        except APIError as exc:
+        except Exception as exc:
             logger.warning("Failed to persist time spine advance for commitment %s: %s", commitment_id, exc)

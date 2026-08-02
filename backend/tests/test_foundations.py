@@ -17,7 +17,8 @@ def test_health_endpoints_do_not_require_services():
     assert live.status_code == 200
     assert live.json()["status"] == "alive"
     assert ready.status_code == 200
-    assert ready.json()["dependencies"]["database"]["state"] == "unconfigured"
+    assert ready.json()["dependencies"]["database"]["state"] == "configuration_missing"
+    assert ready.json()["status"] == "not_ready"
     assert "secret" not in ready.text.lower()
 
 

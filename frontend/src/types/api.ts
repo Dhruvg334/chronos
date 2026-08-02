@@ -213,12 +213,38 @@ export interface TodayResponse {
 }
 
 export interface PlanResponse {
+  timezone?: string;
   range_start: string;
   range_end: string;
   calendar_events: PlanItem[];
   plan_blocks: PlanItem[];
   unscheduled_commitments: PlanItem[];
   ordered_timeline: PlanItem[];
-  capacity: { total_minutes: number; busy_minutes: number; planned_minutes: number; buffer_minutes: number; available_minutes: number };
+  capacity: { total_minutes: number; busy_minutes: number; planned_minutes: number; buffer_minutes: number; available_minutes: number; total_available_minutes: number; scheduled_minutes: number; remaining_minutes: number; over_capacity_minutes: number; confidence: 'low' | 'medium' | 'high'; sources: string[]; calendar_state: string };
   buffer_guidance: string;
+}
+
+export interface PlanningProfile {
+  timezone: string;
+  available_weekdays: number[];
+  working_start_time: string;
+  working_end_time: string;
+  daily_focus_limit_minutes: number;
+  default_focus_duration_minutes: number;
+  minimum_transition_buffer_minutes: number;
+  minimum_daily_unscheduled_buffer_minutes: number;
+  protected_interval_start: string | null;
+  protected_interval_end: string | null;
+  quick_task_threshold_minutes: number;
+  updated_at?: string | null;
+}
+
+export interface IntegrationStatus {
+  provider: string;
+  access: 'read_only';
+  state: 'connected' | 'disconnected' | 'unavailable' | 'configuration_missing';
+  last_successful_sync: string | null;
+  retry_available: boolean;
+  planning_mode: 'calendar_and_profile' | 'profile_only';
+  message: string;
 }

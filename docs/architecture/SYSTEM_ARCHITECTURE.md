@@ -12,14 +12,14 @@ Application code targets protocols in `app/repositories` and `app/models`. Supab
 
 `GET /api/v1/today` composes active commitments, tasks, today’s cached calendar events, focus blocks, pending approvals, active focus state, one deterministic next action, optional recovery context, and at most one Strategy Engine recommendation.
 
-`GET /api/v1/plan` composes calendar events, focus blocks, unscheduled commitments, an eight-hour capacity envelope, and transition buffers. `POST /api/v1/plan/blocks` validates ownership, overlap, and capacity before an explicit user-requested internal write.
+`GET /api/v1/plan` composes calendar events, focus blocks, unscheduled commitments, and profile-driven capacity. The deterministic engine applies the user's IANA timezone, available weekdays, working window, protected interval, daily focus limit, transition buffer, unscheduled reserve, calendar state, and deadline window. It returns remaining and over-capacity minutes with confidence and source metadata. `POST /api/v1/plan/blocks` validates ownership, availability, protected time, transitions, overlap, and capacity before a write.
 
 Focus lifecycle endpoints create or start a session, persist pause/resume timing, expose deterministic stuck options, record completion reflection, update observed progress/risk, and invalidate Today/Plan queries in the UI. Recovery and reflection are contextual rather than primary routes.
 
 ## Persistence migration map
 
-Repository-backed core paths: intake workflow runs and traces; approved commitment/task/time-spine writes; Today; Plan reads and block creation; focus lifecycle; contextual recovery proposals and approval; contextual reflection; core time-spine updates; trace viewing.
+Repository-backed core paths: intake workflow runs and traces; approved commitment/task/time-spine writes; commitment list/detail; Today; Plan; focus lifecycle; contextual recovery; contextual reflection; planning profiles; core time-spine updates; and trace viewing. Application services do not import the compatibility Supabase client.
 
-Compatibility access remains in historical commitment detail CRUD, legacy scheduling endpoints and graph, legacy command/demo data loaders, legacy rescue graph, standalone time-spine service, legacy trace service, calendar sync/event endpoints, and Google OAuth/calendar adapters. Today, Inbox approval, Plan, Focus, contextual recovery, and contextual reflection do not call those paths.
+Compatibility access remains in legacy calendar, command, and scheduling API modules; the legacy scheduling and rescue graphs; and Google OAuth/calendar infrastructure adapters. These paths are outside Today, Inbox approval, Plan, Focus, contextual recovery, contextual reflection, and commitment detail. The compatibility client also remains at the API dependency construction boundary until historical routes move to the application container.
 
-Migration `019_add_focus_session_lifecycle.sql` is forward-only and adds paused status, start/pause timestamps, accumulated pause seconds, and a stop reason. Existing applied migrations remain unchanged.
+Migration 019 adds focus lifecycle state, migration 020 adds the planning profile, and migration 021 adds idempotent transaction RPCs and operation receipts. Intake approval, focus completion, and recovery approval perform their related writes atomically in PostgreSQL.

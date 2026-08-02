@@ -10,7 +10,9 @@ Inbox begins with one plain-language input. Extraction preserves uncertainty, pr
 
 ## Make time concrete
 
-Plan combines cached calendar events, plan blocks, unscheduled active commitments, available capacity, and buffer guidance. Adding a block requires commitment, start time, and duration; overlap and capacity errors remain visible and actionable.
+Plan combines cached calendar events, plan blocks, unscheduled commitments, personal availability, remaining/over-capacity minutes, and buffer guidance. It labels profile-only planning and calendar confidence honestly. Working-window, protected-time, transition, overlap, and capacity errors remain visible and actionable.
+
+Settings makes timezone, available days, working hours, focus limits, default focus duration, transition and daily reserves, optional protected time, and quick-task threshold editable and resettable. Calendar state distinguishes connected, disconnected, unavailable, and configuration missing without exposing provider errors.
 
 ## Keep execution contextual
 

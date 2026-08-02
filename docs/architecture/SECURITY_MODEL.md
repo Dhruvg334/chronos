@@ -9,6 +9,8 @@
 - Return stable public errors with request IDs. Keep diagnostic context in redacted structured logs.
 - Keep `/demo` static and isolated from user workspaces.
 
-Applied migrations 001–018 are immutable. Migration 017 protects OAuth tokens through Vault; its historical SQL text is retained because changing applied migration history is prohibited.
+Applied migrations 001–019 are immutable. Migration 017 protects OAuth tokens through Vault; its historical SQL text is retained because changing applied migration history is prohibited.
+
+Core transaction functions are `SECURITY DEFINER` with a restricted `pg_catalog, public` search path. They validate ownership, lock per idempotency key, and revoke execution from `PUBLIC` and `anon`. Only `authenticated` and `service_role` can execute them. RLS remains enabled on operation receipts and every user-owned core table.
 
 MCP is not active. A future MCP adapter must sit behind the same typed tool registry, validate server identity and schemas, minimize scopes, treat retrieved instructions as data, and never let content authorize a tool call.

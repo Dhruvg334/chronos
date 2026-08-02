@@ -43,7 +43,7 @@ def test_plan_combines_events_blocks_unscheduled_capacity_and_buffers():
     assert data["unscheduled_commitments"][0]["id"] == "c1"
     assert data["capacity"]["busy_minutes"] == 60
     assert data["capacity"]["planned_minutes"] == 60
-    assert data["capacity"]["buffer_minutes"] == 10
+    assert data["capacity"]["buffer_minutes"] == 70
 
 
 def test_plan_block_creation_succeeds_when_free_and_rejects_overlap():

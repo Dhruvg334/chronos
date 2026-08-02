@@ -1,11 +1,16 @@
 # Roadmap
 
+## Core reliability completed
+
+- Personal availability drives Today and Plan capacity without a universal workday assumption.
+- Intake approval, focus completion, and recovery approval use idempotent PostgreSQL transactions with rollback coverage.
+- Core time-spine, trace, and commitment-detail paths use repository protocols.
+- Opt-in local Supabase coverage provisions two users and verifies migration, RLS, transactions, and the core journey.
+
 ## Next core hardening
 
-- Migrate historical commitment detail, legacy scheduling/command, standalone time-spine/trace, and calendar-sync paths when those surfaces re-enter the core journey.
-- Add persisted working-hour and buffer preferences so capacity can replace the current conservative eight-hour daily envelope.
-- Add transactional database functions for multi-row intake approval and focus completion.
-- Add opt-in Supabase integration coverage for migration 019, RLS ownership, overlap behavior, and workflow trace persistence.
+- Move legacy scheduling/command and calendar-sync routes behind repositories when those surfaces re-enter the core journey.
+- Run opt-in Supabase tests in a disposable CI service and add browser-level local-stack smoke coverage.
 - Split shared vendor dependencies further if the entry bundle grows materially.
 
 ## Deliberately deferred

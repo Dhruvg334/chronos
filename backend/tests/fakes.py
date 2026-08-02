@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import copy
 from datetime import datetime
 from typing import Any
 
@@ -12,6 +13,25 @@ class MemoryCommitments:
         self.rows = list(rows or [])
         self.tasks = list(tasks or [])
         self.spines: list[dict[str, Any]] = []
+        self.receipts = {}
+    def approve_intake(self, user_id, run_id, idempotency_key, items):
+        if idempotency_key in self.receipts: return {**self.receipts[idempotency_key], "idempotent_replay": True}
+        before = copy.deepcopy((self.rows, self.tasks, self.spines))
+        try:
+            for item in items:
+                self.create(user_id, {key: value for key, value in item.items() if key not in {"tasks", "time_spine"}})
+                self.create_tasks(user_id, [{**task, "commitment_id": item["id"]} for task in item.get("tasks", [])])
+                spine = item["time_spine"]
+                self.create_time_spine(user_id, {"id": spine["id"], "commitment_id": item["id"], "spine_json": spine["stages"], "current_stage": spine["current_stage"]})
+        except Exception:
+            self.rows, self.tasks, self.spines = before
+            raise
+        result = {"status": "success", "count": len(items), "commitment_ids": [item["id"] for item in items], "idempotent_replay": False}
+        self.receipts[idempotency_key] = result
+        if hasattr(self, "traces"):
+            self.traces.append(user_id, run_id, {"step_name": "approval_completed", "status": "succeeded", "explanation": "Approved atomically.", "payload_json": {"count": len(items)}})
+            self.traces.complete_run(user_id, run_id, {"approved_count": len(items)})
+        return result
     def list_for_user(self, user_id): return [row for row in self.rows if row.get("user_id", user_id) == user_id]
     def get_for_user(self, user_id, commitment_id): return next((row for row in self.list_for_user(user_id) if str(row["id"]) == str(commitment_id)), None)
     def list_tasks_for_user(self, user_id, commitment_id=None): return [row for row in self.tasks if row.get("user_id", user_id) == user_id and (commitment_id is None or str(row.get("commitment_id")) == str(commitment_id))]
@@ -31,7 +51,26 @@ class MemoryCommitments:
 
 
 class MemoryFocus:
-    def __init__(self, rows=None): self.rows = list(rows or [])
+    def __init__(self, rows=None): self.rows = list(rows or []); self.completions = {}
+    def complete_transaction(self, user_id, data):
+        key = data["p_idempotency_key"]
+        if key in self.completions: return {**self.completions[key], "idempotent_replay": True}
+        snapshot = copy.deepcopy((self.rows, self.commitments.rows, self.commitments.spines, self.reflections.rows))
+        try:
+            row = self.get_for_user(user_id, data["p_focus_block_id"])
+            if row is None: raise RuntimeError("not found")
+            row.update(status="completed", paused_at=None)
+            reflection = {"id": data["p_reflection_id"], "commitment_id": row.get("commitment_id"), "focus_block_id": row["id"], "planned_minutes": int((datetime.fromisoformat(str(row["end_at"]).replace("Z", "+00:00")) - datetime.fromisoformat(str(row["start_at"]).replace("Z", "+00:00"))).total_seconds() // 60), "actual_minutes": data["p_actual_minutes"], "completion_status": data["p_completion_status"], "energy_level": data["p_energy_level"], "blocker_reason": data.get("p_blocker_reason"), "notes": data.get("p_notes")}
+            self.reflections.create(user_id, reflection)
+            commitment = self.commitments.get_for_user(user_id, row.get("commitment_id"))
+            commitment.update(actual_minutes=int(commitment.get("actual_minutes") or 0) + data["p_actual_minutes"], progress_percent=data["p_progress_percent"], risk_score=data["p_risk_score"], risk_level=data["p_risk_level"])
+            spine = self.commitments.get_time_spine(user_id, row.get("commitment_id"))
+            if spine: spine.update(current_stage="reflection")
+        except Exception:
+            self.rows[:], self.commitments.rows[:], self.commitments.spines[:], self.reflections.rows[:] = snapshot
+            raise
+        result = {"status": "completed", "focus_block_id": row["id"], "commitment_id": row.get("commitment_id"), "reflection": reflection, "idempotent_replay": False}
+        self.completions[key] = result; return result
     def list_for_user(self, user_id, start_at=None, end_at=None):
         rows = [row for row in self.rows if row.get("user_id", user_id) == user_id]
         if start_at: rows = [row for row in rows if datetime.fromisoformat(str(row["end_at"]).replace("Z", "+00:00")) >= start_at]
@@ -48,7 +87,22 @@ class MemoryFocus:
 
 
 class MemoryPlanning:
-    def __init__(self, events=None, proposals=None): self.events = list(events or []); self.proposals = list(proposals or [])
+    def __init__(self, events=None, proposals=None): self.events = list(events or []); self.proposals = list(proposals or []); self.approvals = {}
+    def approve_recovery(self, user_id, proposal_id, idempotency_key, focus_block_id):
+        if idempotency_key in self.approvals: return {**self.approvals[idempotency_key], "idempotent_replay": True}
+        snapshot = copy.deepcopy((self.proposals, self.focus.rows))
+        try:
+            proposal = self.get_proposal(user_id, proposal_id)
+            if not proposal or proposal.get("status") != "pending": raise RuntimeError("not found")
+            payload = proposal.get("payload_json") or {}; created = None
+            if payload.get("rescue_action_type") == "create_rescue_focus_block":
+                created = self.focus.create(user_id, {"id": focus_block_id, "commitment_id": payload["commitment_id"], "title": payload.get("title", "Recovery focus"), "start_at": payload["start_at"], "end_at": payload["end_at"], "block_type": "deep_work", "status": "scheduled"})
+            proposal["status"] = "approved"
+        except Exception:
+            self.proposals[:], self.focus.rows[:] = snapshot
+            raise
+        result = {"status": "approved", "action": payload.get("rescue_action_type"), "focus_block": created, "idempotent_replay": False}
+        self.approvals[idempotency_key] = result; return result
     def list_pending(self, user_id): return [row for row in self.proposals if row.get("user_id", user_id) == user_id and row.get("status") == "pending"]
     def list_calendar_events(self, user_id, start_at, end_at):
         return [row for row in self.events if row.get("user_id", user_id) == user_id and datetime.fromisoformat(str(row["start_at"]).replace("Z", "+00:00")) < end_at and datetime.fromisoformat(str(row["end_at"]).replace("Z", "+00:00")) > start_at]
@@ -78,8 +132,31 @@ class MemoryTraces:
 
 
 class MemoryGoogle:
+    def __init__(self, state="disconnected"): self.state = state
     def get_metadata(self, user_id): return None
+    def get_status(self, user_id): return {"state": self.state, "last_successful_sync": None}
 
 
-def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None):
-    return RepositorySet(commitments or MemoryCommitments(), focus or MemoryFocus(), planning or MemoryPlanning(), reflections or MemoryReflections(), traces or MemoryTraces(), MemoryGoogle())
+class MemoryPlanningProfiles:
+    DEFAULTS = {
+        "timezone": "UTC", "available_weekdays": [0, 1, 2, 3, 4, 5, 6],
+        "working_start_time": "09:00:00", "working_end_time": "17:00:00",
+        "daily_focus_limit_minutes": 240, "default_focus_duration_minutes": 45,
+        "minimum_transition_buffer_minutes": 10,
+        "minimum_daily_unscheduled_buffer_minutes": 60,
+        "protected_interval_start": None, "protected_interval_end": None,
+        "quick_task_threshold_minutes": 5,
+    }
+    def __init__(self, rows=None): self.rows = dict(rows or {})
+    def get(self, user_id): return {**self.DEFAULTS, **self.rows.get(user_id, {})}
+    def update(self, user_id, data):
+        self.rows[user_id] = {**self.get(user_id), **data}; return self.rows[user_id]
+    def reset(self, user_id): self.rows[user_id] = self.DEFAULTS.copy(); return self.rows[user_id]
+
+
+def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None):
+    commitments = commitments or MemoryCommitments(); focus = focus or MemoryFocus(); planning = planning or MemoryPlanning(); reflections = reflections or MemoryReflections(); traces = traces or MemoryTraces()
+    commitments.traces = traces
+    focus.commitments = commitments; focus.reflections = reflections
+    planning.focus = focus; planning.traces = traces
+    return RepositorySet(commitments, focus, planning, reflections, traces, google or MemoryGoogle(), profiles or MemoryPlanningProfiles())

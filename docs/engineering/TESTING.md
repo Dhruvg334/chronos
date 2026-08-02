@@ -11,7 +11,9 @@ python -m pytest
 python -m pytest -m integration
 ```
 
-Runtime tests cover step and request budgets, timeouts, unknown tools, argument/result validation, read execution, internal/external write approval, model selection, idempotency metadata, and trace persistence on success and failure. Core journey tests cover consolidated Today, Strategy Engine cases, Plan composition/conflicts, Focus lifecycle, intake approval, recovery, and reflection.
+Runtime tests cover step and request budgets, timeouts, unknown tools, argument/result validation, read execution, internal/external write approval, model selection, idempotency metadata, and trace persistence. Core tests cover Today, Strategy Engine cases, profile capacity, Plan, Focus, intake, recovery, reflection, settings validation, and injected transaction rollback.
+
+Integration tests are opt-in. Set `RUN_SUPABASE_INTEGRATION=1`, `SUPABASE_TEST_URL`, `SUPABASE_TEST_ANON_KEY`, and `SUPABASE_TEST_SERVICE_ROLE_KEY` from a disposable local stack. Without them, integration tests skip clearly. Live tests provision `chronos.alpha@example.com` and `chronos.beta@example.com`, exercise the core journey, and verify direct-JWT and backend ownership boundaries.
 
 Frontend:
 
@@ -24,6 +26,6 @@ npm run test -- --run
 npm run build
 ```
 
-Frontend tests cover consolidated Today, focus start/pause/resume/finish, stuck options, contextual reflection and recovery, plan-block success/conflict, strategy evidence, logout cache clearing, protected routes, and lazy route fallback.
+Frontend tests cover Today, Focus, contextual reflection/recovery, plan success/conflict/transaction failure, capacity and overload, profile-only degradation, personal availability validation/persistence, timezone rendering, schema incompatibility, logout cache clearing, protected routes, and lazy route fallback.
 
-Manual core profile: capture the documented multi-commitment sample, approve reviewed drafts, create a 60-minute authentication-fix block tomorrow at 10:00, repeat it to verify the overlap error, then run a 25-minute focus session through pause, resume, stuck, and partial reflection.
+Manual profile: use `Asia/Kolkata`, Monday–Saturday, 09:30–18:30, 300 focus minutes, 45 default focus minutes, 10 transition minutes, 60 unscheduled minutes, lunch 13:00–14:00, and a 5-minute quick-task threshold. Confirm meetings, lunch, and transitions cannot overlap before running focus and recovery.

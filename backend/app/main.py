@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.errors import ChronosError, HTTP_STATUS_BY_ERROR
 from app.core.observability import log_event, request_context_middleware, request_id_context
-from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake, google, scheduling, command, demo, today, plan
+from app.services.readiness import readiness_report
+from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake, google, scheduling, command, demo, today, plan, settings as settings_api
 
 app = FastAPI(
     title="ChronOS API",
@@ -39,24 +40,13 @@ async def liveness():
 
 
 @app.get("/api/v1/health/ready")
-async def readiness():
-    database_configured = bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
-    model_configured = bool(settings.LLM_PROVIDER == "groq" and settings.GROQ_API_KEY and settings.GROQ_MODEL_FAST)
-    google_configured = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
-    return {
-        "status": "ready" if database_configured else "degraded",
-        "environment": settings.ENV,
-        "dependencies": {
-            "database": {"required": True, "state": "configured" if database_configured else "unconfigured"},
-            "model": {"required": False, "provider": settings.LLM_PROVIDER, "state": "configured" if model_configured else "degraded"},
-            "google_calendar": {"required": False, "state": "configured" if google_configured else "unconfigured"},
-        },
-    }
+async def readiness(check_model: bool = False):
+    return await readiness_report(check_model=check_model)
 
 
 @app.get("/api/v1/health")
 async def health_compatibility():
-    return await readiness()
+    return await readiness_report()
 
 # Include v1 Routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
@@ -72,6 +62,7 @@ app.include_router(command.router, prefix="/api/v1/command", tags=["command"])
 app.include_router(demo.router, prefix="/api/v1/demo", tags=["demo"])
 app.include_router(today.router, prefix="/api/v1/today", tags=["today"])
 app.include_router(plan.router, prefix="/api/v1/plan", tags=["plan"])
+app.include_router(settings_api.router, prefix="/api/v1/settings", tags=["settings"])
 from app.api.v1.focus_blocks import router as fb_router
 app.include_router(fb_router, prefix="/api/v1/focus-blocks", tags=["focus_blocks"])
 app.include_router(intake.router)

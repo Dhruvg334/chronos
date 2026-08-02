@@ -8,6 +8,6 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 // A non-routable placeholder keeps public routes usable while exposing honest
 // configuration state. Auth methods are guarded before use.
 export const supabase = createClient(
-  supabaseUrl || 'http://127.0.0.1:54321',
+  supabaseUrl || 'http://127.0.0.1:55321',
   supabaseAnonKey || 'configuration-required',
 );

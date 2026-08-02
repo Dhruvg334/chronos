@@ -22,6 +22,14 @@ class _BaseRepository:
 
 
 class SupabaseCommitmentsRepository(_BaseRepository):
+    def approve_intake(self, user_id: str, run_id: str, idempotency_key: str, items: list[dict[str, Any]]) -> dict[str, Any]:
+        try:
+            result = self.client.rpc("approve_intake_transaction", {"p_user_id": user_id, "p_run_id": run_id, "p_idempotency_key": idempotency_key, "p_items": items}).execute().data
+            if result.get("status") == "failed": raise RuntimeError(result.get("error_code"))
+            return result
+        except Exception as exc:
+            raise self._failure("intake.approve_transaction", exc) from exc
+
     def list_for_user(self, user_id: str) -> list[dict[str, Any]]:
         try:
             return self.client.table("commitments").select("*").eq("user_id", user_id).order("created_at", desc=True).execute().data or []
@@ -94,6 +102,14 @@ class SupabaseCommitmentsRepository(_BaseRepository):
 
 
 class SupabaseFocusRepository(_BaseRepository):
+    def complete_transaction(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            result = self.client.rpc("complete_focus_transaction", {"p_user_id": user_id, **data}).execute().data
+            if result.get("status") == "failed": raise RuntimeError(result.get("error_code"))
+            return result
+        except Exception as exc:
+            raise self._failure("focus.complete_transaction", exc) from exc
+
     def list_for_user(self, user_id: str, start_at: datetime | None = None, end_at: datetime | None = None) -> list[dict[str, Any]]:
         try:
             query = self.client.table("focus_blocks").select("*").eq("user_id", user_id)
@@ -141,6 +157,14 @@ class SupabaseFocusRepository(_BaseRepository):
 
 
 class SupabasePlanningRepository(_BaseRepository):
+    def approve_recovery(self, user_id: str, proposal_id: str, idempotency_key: str, focus_block_id: str | None) -> dict[str, Any]:
+        try:
+            result = self.client.rpc("approve_recovery_transaction", {"p_user_id": user_id, "p_proposal_id": proposal_id, "p_idempotency_key": idempotency_key, "p_focus_block_id": focus_block_id}).execute().data
+            if result.get("status") == "failed": raise RuntimeError(result.get("error_code"))
+            return result
+        except Exception as exc:
+            raise self._failure("recovery.approve_transaction", exc) from exc
+
     def list_pending(self, user_id: str) -> list[dict[str, Any]]:
         try:
             return self.client.table("agent_proposed_actions").select("*").eq("user_id", user_id).eq("status", "pending").order("created_at").execute().data or []
@@ -249,6 +273,65 @@ class SupabaseGoogleConnectionRepository(_BaseRepository):
         except Exception:
             return None
 
+    def get_status(self, user_id: str) -> dict[str, Any]:
+        try:
+            rows = self.client.table("google_connections").select("google_email,last_synced_at").eq("user_id", user_id).limit(1).execute().data or []
+            metadata = rows[0] if rows else None
+            if metadata:
+                return {"state": "connected", "last_successful_sync": metadata.get("last_synced_at"), "email": metadata.get("google_email")}
+            return {"state": "disconnected", "last_successful_sync": None}
+        except Exception:
+            return {"state": "unavailable", "last_successful_sync": None}
+
+
+PLANNING_PROFILE_COLUMNS = (
+    "timezone,available_weekdays,working_start_time,working_end_time,"
+    "daily_focus_limit_minutes,default_focus_duration_minutes,"
+    "minimum_transition_buffer_minutes,minimum_daily_unscheduled_buffer_minutes,"
+    "protected_interval_start,protected_interval_end,quick_task_threshold_minutes,updated_at"
+)
+
+PLANNING_PROFILE_DEFAULTS: dict[str, Any] = {
+    "timezone": "UTC",
+    "available_weekdays": [0, 1, 2, 3, 4, 5, 6],
+    "working_start_time": "09:00:00",
+    "working_end_time": "17:00:00",
+    "daily_focus_limit_minutes": 240,
+    "default_focus_duration_minutes": 45,
+    "minimum_transition_buffer_minutes": 10,
+    "minimum_daily_unscheduled_buffer_minutes": 60,
+    "protected_interval_start": None,
+    "protected_interval_end": None,
+    "quick_task_threshold_minutes": 5,
+}
+
+
+class SupabasePlanningProfileRepository(_BaseRepository):
+    def get(self, user_id: str) -> dict[str, Any]:
+        try:
+            rows = self.client.table("user_profiles").select(PLANNING_PROFILE_COLUMNS).eq("id", user_id).limit(1).execute().data or []
+            if not rows:
+                raise ChronosError(ErrorCode.VALIDATION, "Planning profile not found.")
+            return rows[0]
+        except ChronosError:
+            raise
+        except Exception as exc:
+            raise self._failure("planning_profile.get", exc) from exc
+
+    def update(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("user_profiles").update(data).eq("id", user_id).execute().data or []
+            if not rows:
+                raise ChronosError(ErrorCode.VALIDATION, "Planning profile not found.")
+            return {key: rows[0].get(key) for key in PLANNING_PROFILE_COLUMNS.split(",")}
+        except ChronosError:
+            raise
+        except Exception as exc:
+            raise self._failure("planning_profile.update", exc) from exc
+
+    def reset(self, user_id: str) -> dict[str, Any]:
+        return self.update(user_id, PLANNING_PROFILE_DEFAULTS.copy())
+
 
 def create_repository_set(client: Client) -> RepositorySet:
     return RepositorySet(
@@ -258,4 +341,5 @@ def create_repository_set(client: Client) -> RepositorySet:
         reflections=SupabaseReflectionsRepository(client),
         traces=SupabaseWorkflowTraceRepository(client),
         google_connections=SupabaseGoogleConnectionRepository(client),
+        planning_profiles=SupabasePlanningProfileRepository(client),
     )

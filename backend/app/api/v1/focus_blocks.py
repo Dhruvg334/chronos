@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 
 from app.api.dependencies import get_current_user, get_repositories
@@ -153,30 +153,27 @@ async def focus_stuck(block_id: str, user_id: str = Depends(get_current_user), r
 
 
 @router.post("/{block_id}/complete", response_model=FocusSessionResponse)
-async def complete_focus_block(request: CompleteFocusRequest, block_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+async def complete_focus_block(request: CompleteFocusRequest, block_id: str, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
     block = _get_block(repositories, user_id, block_id)
     commitment_id = block.get("commitment_id")
     commitment = repositories.commitments.get_for_user(user_id, commitment_id) if commitment_id else None
     if not commitment:
         raise ChronosError(ErrorCode.VALIDATION, "The focus session is not linked to an available commitment.")
-    updated_block = repositories.focus.update(user_id, block_id, {"status": "completed", "paused_at": None})
-    planned = max(0, int((parse_datetime(block["end_at"]) - parse_datetime(block["start_at"])).total_seconds() // 60))
-    reflection = repositories.reflections.create(user_id, {
-        "id": str(uuid.uuid4()),
-        "commitment_id": commitment_id,
-        "focus_block_id": block_id,
-        "planned_minutes": planned,
-        "actual_minutes": request.actual_minutes,
-        "completion_status": request.completion_status,
-        "energy_level": request.energy_level,
-        "blocker_reason": request.blocker_reason,
-        "notes": request.notes,
-    })
-    actual = int(commitment.get("actual_minutes") or 0) + request.actual_minutes
     risk_score, risk_level = observed_risk(commitment, progress_percent=request.progress_percent)
-    repositories.commitments.update(user_id, commitment_id, {"actual_minutes": actual, "progress_percent": request.progress_percent, "risk_score": risk_score, "risk_level": risk_level})
-    _advance_spine(repositories, user_id, commitment_id)
-    return FocusSessionResponse(session=None, reflection=reflection, reflection_requested=False)
+    result = repositories.focus.complete_transaction(user_id, {
+        "p_focus_block_id": block_id,
+        "p_reflection_id": str(uuid.uuid4()),
+        "p_idempotency_key": idempotency_key or f"focus-{block_id}-{request.actual_minutes}-{request.progress_percent}",
+        "p_actual_minutes": request.actual_minutes,
+        "p_completion_status": request.completion_status,
+        "p_energy_level": request.energy_level,
+        "p_progress_percent": request.progress_percent,
+        "p_risk_score": risk_score,
+        "p_risk_level": risk_level,
+        "p_blocker_reason": request.blocker_reason,
+        "p_notes": request.notes,
+    })
+    return FocusSessionResponse(session=None, reflection=result.get("reflection"), reflection_requested=False)
 
 
 @router.post("/{block_id}/skip", response_model=FocusSessionResponse)

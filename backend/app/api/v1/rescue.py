@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 
 from app.api.dependencies import get_current_user, get_repositories
 from app.core.errors import ChronosError, ErrorCode
 from app.repositories.protocols import RepositorySet
-from app.services.core_journey import CoreJourneyService, rank_commitments
+from app.services.core_journey import rank_commitments
 
 router = APIRouter()
 
@@ -49,17 +48,11 @@ def _pending(repositories: RepositorySet, user_id: str, proposal_id: str) -> dic
 
 
 @router.post("/proposals/{proposal_id}/approve")
-def approve_rescue_proposal(proposal_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
+def approve_rescue_proposal(proposal_id: str, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
     proposal = _pending(repositories, user_id, proposal_id)
     payload = proposal.get("payload_json") or {}
-    created = None
-    if payload.get("rescue_action_type") == "create_rescue_focus_block":
-        start = datetime.fromisoformat(str(payload["start_at"]).replace("Z", "+00:00"))
-        end = datetime.fromisoformat(str(payload["end_at"]).replace("Z", "+00:00"))
-        duration = max(10, int((end - start).total_seconds() // 60))
-        created = CoreJourneyService(repositories).create_plan_block(user_id, payload["commitment_id"], start, duration, payload.get("title"), "deep_work")
-    repositories.planning.update_proposal(user_id, proposal_id, {"status": "approved"})
-    return {"status": "approved", "action": payload.get("rescue_action_type"), "focus_block": created}
+    focus_block_id = str(uuid.uuid4()) if payload.get("rescue_action_type") == "create_rescue_focus_block" else None
+    return repositories.planning.approve_recovery(user_id, proposal_id, idempotency_key or f"recovery-{proposal_id}", focus_block_id)
 
 
 @router.post("/proposals/{proposal_id}/reject")

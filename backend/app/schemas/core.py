@@ -72,9 +72,17 @@ class CapacityView(BaseModel):
     planned_minutes: int
     buffer_minutes: int
     available_minutes: int
+    total_available_minutes: int
+    scheduled_minutes: int
+    remaining_minutes: int
+    over_capacity_minutes: int
+    confidence: Literal["low", "medium", "high"]
+    sources: tuple[str, ...]
+    calendar_state: str
 
 
 class PlanResponse(BaseModel):
+    timezone: str
     range_start: datetime
     range_end: datetime
     calendar_events: list[PlanItemView]
