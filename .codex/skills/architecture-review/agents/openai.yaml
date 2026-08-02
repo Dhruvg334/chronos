@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Review"
+  short_description: "Review boundaries, coupling, and migration risk"
+  default_prompt: "Use $architecture-review to review this ChronOS architecture change."

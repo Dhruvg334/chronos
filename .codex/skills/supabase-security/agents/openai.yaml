@@ -1,0 +1,4 @@
+interface:
+  display_name: "Supabase Security"
+  short_description: "Audit RLS, auth, Vault, and migrations"
+  default_prompt: "Use $supabase-security to review this database change."

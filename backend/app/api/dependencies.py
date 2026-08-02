@@ -3,6 +3,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import os
 
 from app.core.supabase import get_supabase_client
+from app.models.gateway import ModelGateway
+from app.repositories.protocols import RepositorySet
+from app.repositories.supabase import create_repository_set
+from app.core.container import container
 
 security = HTTPBearer(auto_error=False)
 
@@ -54,3 +58,11 @@ def get_current_user(user_id: str = Depends(get_current_user_id)) -> str:
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required.")
     return user_id
+
+
+def get_repositories() -> RepositorySet:
+    return create_repository_set(get_supabase_client())
+
+
+def get_model_gateway() -> ModelGateway:
+    return container.model_gateway()

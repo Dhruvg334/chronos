@@ -1,25 +1,25 @@
-import logging
-from typing import Optional
-from supabase import create_client, Client
+"""Compatibility boundary for paths not yet migrated to repository injection.
+
+The facade contains no live client and performs no work during import. New code must
+depend on repository protocols or FastAPI dependencies instead of importing this name.
+"""
+from typing import Any
+
 from app.core.config import settings
+from app.core.container import container
 
-logger = logging.getLogger("uvicorn.error")
 
-supabase_client: Optional[Client] = None
+class _LazyDatabaseFacade:
+    _is_coroutine_marker = None
+    _is_coroutine = None
 
-# The backend is trusted server-side code. Prefer the service role key when present
-# so RLS does not break internal persistence during the temporary DEV_USER_ID phase.
-# Frontend code must never receive or use SUPABASE_SERVICE_ROLE_KEY.
-supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY
+    def __bool__(self) -> bool:
+        return bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
 
-if settings.SUPABASE_URL and supabase_key:
-    try:
-        supabase_client = create_client(settings.SUPABASE_URL, supabase_key)
-        logger.info(
-            "Supabase client initialized with %s key.",
-            "service_role" if settings.SUPABASE_SERVICE_ROLE_KEY else "anon",
-        )
-    except Exception as e:
-        logger.error("Failed to initialize Supabase client: %s", str(e))
-else:
-    logger.warning("Supabase environment variables are missing. Client not initialized.")
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return getattr(container.database(), name)
+
+
+supabase_client = _LazyDatabaseFacade()

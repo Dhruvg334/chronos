@@ -1,0 +1,16 @@
+import { useQuery } from '@tanstack/react-query';
+import { CalendarDays, Clock3, Plus } from 'lucide-react';
+import AppShell from '../components/layout/AppShell';
+import { ErrorState, LoadingState, PageHeader, Surface } from '../components/ui/primitives';
+import { apiFetch, apiUrl, getApiErrorMessage } from '../lib/api';
+
+type CalendarEvent = { id: string; title: string; start_at: string; end_at: string };
+
+async function loadEvents(): Promise<CalendarEvent[]> { const response = await apiFetch(apiUrl('/api/v1/calendar/events')); if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Calendar events could not be loaded.')); const data = await response.json(); return data.events ?? []; }
+
+export default function Plan() {
+  const query = useQuery({ queryKey: ['calendar-events'], queryFn: loadEvents });
+  return <AppShell><PageHeader eyebrow="Plan" title="Make the work fit the time" description="Calendar reality, planned focus, unscheduled work, and buffers belong in one calm surface." action={<button className="button-secondary"><Plus className="mr-2 h-4 w-4" />Add plan block</button>} />
+    {query.isPending ? <LoadingState label="Loading the plan" /> : query.isError ? <ErrorState message={query.error instanceof Error ? query.error.message : 'Calendar events could not be loaded.'} onRetry={() => query.refetch()} /> : <div className="grid gap-5 lg:grid-cols-[1fr_300px]"><Surface className="overflow-hidden"><div className="flex items-center justify-between border-b border-line p-5"><div><h2 className="font-semibold">Today</h2><p className="mt-1 text-sm text-muted">Events and plan blocks</p></div><CalendarDays className="h-5 w-5 text-accent" /></div><div className="p-5"><div className="relative ml-14 border-l border-line pl-6">{query.data.length ? query.data.map(event => <article key={event.id} className="relative mb-4 rounded-xl border border-line bg-surface-subtle p-4 before:absolute before:-left-[31px] before:top-5 before:h-2 before:w-2 before:rounded-full before:bg-accent"><p className="text-xs text-muted">{new Date(event.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p><h3 className="mt-1 font-medium">{event.title}</h3></article>) : <div className="py-12 text-center"><Clock3 className="mx-auto h-6 w-6 text-faint" /><h3 className="mt-3 font-medium">No synced events yet</h3><p className="mt-1 text-sm text-muted">You can still shape the day with plan blocks and buffers.</p></div>}</div></div></Surface><div className="space-y-5"><Surface className="p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Capacity</p><p className="mt-3 text-2xl font-semibold">Uncalculated</p><p className="mt-1 text-sm text-muted">Connect a read-only calendar to calculate usable focus time.</p></Surface><Surface className="p-5"><h2 className="font-semibold">Unscheduled work</h2><p className="mt-2 text-sm text-muted">Commitment allocation will move here as repository migration continues.</p></Surface><Surface className="p-5"><h2 className="font-semibold">Buffer rule</h2><p className="mt-2 text-sm text-muted">Leave transition time between meetings and demanding focus.</p></Surface></div></div>}
+  </AppShell>;
+}

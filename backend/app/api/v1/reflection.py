@@ -1,17 +1,20 @@
 from datetime import datetime, timezone
 from typing import Optional
 import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.database import supabase_client
+from app.core.observability import log_event
 from app.api.dependencies import get_current_user
 from app.services.risk_service import recalculate_commitment_risk
 from app.services.time_spine_service import advance_time_spine_stage, get_time_spine_view
 from app.services.trace_service import AgentTraceLogger, create_agent_run, update_agent_run
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class CreateReflectionRequest(BaseModel):
@@ -42,7 +45,7 @@ def _log_activity(user_id: str, step_name: str, explanation: str, payload: dict)
         AgentTraceLogger(user_id, run_id).log(step_name, payload, explanation=explanation)
         update_agent_run(run_id, "completed", output_data={"step_name": step_name})
     except Exception as exc:
-        print(f"Failed to log activity {step_name}: {exc}")
+        log_event(logger, logging.WARNING, "activity_trace_failed", step=step_name, exception=type(exc).__name__)
 
 
 @router.post("")

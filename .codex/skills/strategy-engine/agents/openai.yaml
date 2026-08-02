@@ -1,0 +1,4 @@
+interface:
+  display_name: "Strategy Engine"
+  short_description: "Design evidence-based planning guidance"
+  default_prompt: "Use $strategy-engine to add this planning strategy."

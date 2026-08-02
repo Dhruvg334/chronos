@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ShieldAlert, Loader2, Mail } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -47,6 +47,10 @@ export default function Signup() {
     const passError = validatePassword(password, email);
     if (passError) {
       setError(passError);
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      setError('Authentication is not configured in this environment.');
       return;
     }
 
@@ -96,7 +100,7 @@ export default function Signup() {
       <div className="w-full max-w-md bg-white border border-warm-border rounded-2xl shadow-sm p-8">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-extrabold text-text-primary mb-2">Create an account</h1>
-          <p className="text-text-secondary">Join ChronOS to start recovering your deadlines.</p>
+          <p className="text-text-secondary">Build a realistic plan around your commitments and available time.</p>
         </div>
 
         {error && (
@@ -106,7 +110,7 @@ export default function Signup() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-text-secondary mb-1">Email</label>
             <input
@@ -124,7 +128,7 @@ export default function Signup() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 bg-white border border-warm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-amber text-text-primary"
-              placeholder="••••••••"
+              placeholder="At least 8 characters"
             />
           </div>
           <div>
@@ -134,7 +138,7 @@ export default function Signup() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-4 py-2 bg-white border border-warm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-amber text-text-primary"
-              placeholder="••••••••"
+              placeholder="Repeat your password"
             />
           </div>
           

@@ -25,7 +25,7 @@ SELECT public.set_google_tokens(
 
 
 -- ============================================================================
--- SCENARIO A: Hackathon Week (Core Loop)
+-- SCENARIO A: High-pressure project week
 -- ============================================================================
 
 -- Commitments
@@ -33,7 +33,7 @@ INSERT INTO public.commitments (id, user_id, title, description, type, status, d
 VALUES (
     'a0000000-0000-0000-0000-000000000000',
     '00000000-0000-0000-0000-000000000000',
-    'Vibe2Ship Hackathon Demo',
+    'Authentication Regression Fix',
     'Complete the ChronOS agent flow and frontend canvas.',
     'hard_deadline'::public.commitment_type,
     'active'::public.commitment_status,
@@ -41,7 +41,7 @@ VALUES (
     1200,
     0,
     5,
-    'Lose hackathon submission deadline',
+    'Miss the customer validation deadline',
     2,
     10,
     'stable'::public.risk_level_type,

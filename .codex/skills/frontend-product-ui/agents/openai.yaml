@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Product UI"
+  short_description: "Build accessible ChronOS product interfaces"
+  default_prompt: "Use $frontend-product-ui to implement this ChronOS interface."

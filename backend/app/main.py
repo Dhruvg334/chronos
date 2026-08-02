@@ -1,12 +1,16 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.core.database import supabase_client
+from app.core.errors import ChronosError, HTTP_STATUS_BY_ERROR
+from app.core.observability import log_event, request_context_middleware, request_id_context
 from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake, google, scheduling, command, demo
 
 app = FastAPI(
     title="ChronOS API",
-    description="Proactive AI Time Operating System Backend Service",
+    description="Personal planning and execution service",
     version="1.0.0"
 )
 
@@ -18,25 +22,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(request_context_middleware)
 
-# Health Check Route
-@app.get("/api/v1/health")
-async def health_check():
-    db_ok = False
-    if supabase_client is not None:
-        try:
-            # Check connection presence by validating configuration variables
-            db_ok = bool(settings.SUPABASE_URL and settings.SUPABASE_ANON_KEY)
-        except Exception:
-            db_ok = False
+@app.exception_handler(ChronosError)
+async def chronos_error_handler(request: Request, exc: ChronosError):
+    log_event(logging.getLogger("chronos.error"), logging.WARNING, "handled_error", code=exc.code, path=request.url.path, context=exc.context)
+    return JSONResponse(
+        status_code=HTTP_STATUS_BY_ERROR[exc.code],
+        content={"error": {"code": exc.code, "message": exc.public_message, "request_id": request_id_context.get()}},
+    )
 
+
+@app.get("/api/v1/health/live")
+async def liveness():
+    return {"status": "alive", "environment": settings.ENV}
+
+
+@app.get("/api/v1/health/ready")
+async def readiness():
+    database_configured = bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
+    model_configured = bool(settings.LLM_PROVIDER == "groq" and settings.GROQ_API_KEY and settings.GROQ_MODEL_FAST)
+    google_configured = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
     return {
-        "status": "healthy",
+        "status": "ready" if database_configured else "degraded",
         "environment": settings.ENV,
-        "supabase_configured": db_ok,
-        "gemini_configured": bool(settings.GEMINI_API_KEY),
-        "google_oauth_configured": bool(settings.GOOGLE_CLIENT_ID)
+        "dependencies": {
+            "database": {"required": True, "state": "configured" if database_configured else "unconfigured"},
+            "model": {"required": False, "provider": settings.LLM_PROVIDER, "state": "configured" if model_configured else "degraded"},
+            "google_calendar": {"required": False, "state": "configured" if google_configured else "unconfigured"},
+        },
     }
+
+
+@app.get("/api/v1/health")
+async def health_compatibility():
+    return await readiness()
 
 # Include v1 Routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])

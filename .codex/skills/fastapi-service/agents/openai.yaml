@@ -1,0 +1,4 @@
+interface:
+  display_name: "FastAPI Service"
+  short_description: "Implement safe injectable FastAPI services"
+  default_prompt: "Use $fastapi-service to implement this backend service."

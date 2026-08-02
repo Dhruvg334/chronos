@@ -17,7 +17,7 @@ router = APIRouter()
 
 def _frontend_redirect(query: str) -> RedirectResponse:
     frontend_url = settings.FRONTEND_URL.rstrip("/")
-    return RedirectResponse(url=f"{frontend_url}/command?{query}")
+    return RedirectResponse(url=f"{frontend_url}/today?{query}")
 
 
 @router.get("/auth/url")

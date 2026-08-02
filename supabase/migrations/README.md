@@ -22,7 +22,7 @@ This directory holds the PostgreSQL migration files. They must be executed in th
 8. `008_create_drift_events.sql`
    - Stores plan mismatch records.
 9. `009_create_agent_runs.sql`
-   - Tracks LangGraph pipeline checkpoints.
+   - Tracks durable workflow checkpoints.
 10. `010_create_agent_trace_events.sql`
     - Stores backend real-time logging trace records.
 11. `011_create_agent_proposed_actions.sql`

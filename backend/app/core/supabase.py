@@ -1,9 +1,8 @@
-from supabase import Client, create_client
+from supabase import Client
 
-from app.core.config import settings
+from app.core.container import container
 
 
 def get_supabase_client() -> Client:
-    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
-        raise ValueError("Supabase URL and service role key must be configured on the backend.")
-    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    """Return the application-owned client, creating it only on first use."""
+    return container.database()

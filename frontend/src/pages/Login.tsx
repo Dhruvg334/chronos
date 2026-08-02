@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ShieldAlert, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../components/auth/AuthProvider';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { useAuth } from '../components/auth/auth-context';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export default function Login() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   useEffect(() => {
-    if (session) navigate('/command');
+    if (session) navigate('/today');
   }, [session, navigate]);
 
   if (session) return null;
@@ -25,6 +25,10 @@ export default function Login() {
 
     if (!email || !password) {
       setError('Please enter both email and password.');
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      setError('Authentication is not configured in this environment.');
       return;
     }
 
@@ -40,7 +44,7 @@ export default function Login() {
       }
       
       // onAuthStateChange in AuthProvider will handle the redirect
-      navigate('/command');
+      navigate('/today');
     } catch {
       setError('Invalid credentials or email not verified.');
     } finally {
@@ -51,11 +55,16 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setError(null);
     setIsGoogleLoading(true);
+    if (!isSupabaseConfigured) {
+      setError('Authentication is not configured in this environment.');
+      setIsGoogleLoading(false);
+      return;
+    }
     try {
       const { data, error: googleError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/command`
+          redirectTo: `${window.location.origin}/today`
         }
       });
       

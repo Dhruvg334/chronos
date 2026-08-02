@@ -150,7 +150,7 @@ def _next_best_action(
         return f"ChronOS found {rescue_candidate_count} rescue candidates. Generate a rescue plan next."
     if commitments_count > 0:
         return "Start with the next safest block."
-    return "No commitments yet. Add a brain dump or load the judge demo."
+    return "No commitments yet. Add a capture or open the guided demo."
 
 
 @router.post("/analyze")
@@ -208,7 +208,7 @@ def run_command_analysis(user_id: str = Depends(get_current_user)) -> Dict[str, 
 
 
 @router.post("/demo/load")
-def load_judge_demo(user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
+def load_sample_scenario(user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
     if not supabase_client:
         raise HTTPException(status_code=500, detail="Database not configured")
 
@@ -222,8 +222,8 @@ def load_judge_demo(user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
     demo_commitments = [
         {
             "user_id": user_id,
-            "title": "[DEMO] Final Submission Build",
-            "description": "The hackathon submission is due very soon. This creates an intentionally compromised timeline for the judge demo.",
+            "title": "[DEMO] Authentication Regression Fix",
+            "description": "A high-impact authentication regression needs a protected block before tomorrow afternoon.",
             "type": "hard_deadline",
             "status": "active",
             "deadline_at": (now - timedelta(hours=2)).isoformat(),
@@ -236,8 +236,8 @@ def load_judge_demo(user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
         },
         {
             "user_id": user_id,
-            "title": "[DEMO] Record Demo Video",
-            "description": "Record the 3-minute product walkthrough and upload it before submission.",
+            "title": "[DEMO] Prepare Monday Slides",
+            "description": "Prepare the first clear draft of the slides for Monday's review.",
             "type": "hard_deadline",
             "status": "active",
             "deadline_at": (now + timedelta(hours=4)).isoformat(),
@@ -250,8 +250,8 @@ def load_judge_demo(user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
         },
         {
             "user_id": user_id,
-            "title": "[DEMO] Polish Submission Writeup",
-            "description": "Finalize the project description and architecture explanation.",
+            "title": "[DEMO] Review Deployment Notes",
+            "description": "Review the deployment notes and record any unresolved risks.",
             "type": "soft_deadline",
             "status": "active",
             "deadline_at": (now + timedelta(days=1)).isoformat(),

@@ -1,59 +1,16 @@
+import { ArrowRight, CalendarCheck, CheckCircle2, Inbox } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../components/auth/AuthProvider';
+import { useAuth } from '../components/auth/auth-context';
+
+const steps = [
+  { icon: Inbox, title: 'Capture', text: 'Put scattered commitments into one low-friction inbox.' },
+  { icon: CalendarCheck, title: 'Shape the day', text: 'Fit meaningful work around calendar reality and buffers.' },
+  { icon: CheckCircle2, title: 'Focus and adapt', text: 'Take the next action and repair the plan when reality changes.' },
+];
 
 export default function Landing() {
   const { session } = useAuth();
-
-  return (
-    <div className="min-h-screen bg-warm-ivory flex flex-col items-center justify-center p-6">
-      <main className="w-full max-w-2xl bg-white border border-warm-border rounded-3xl p-10 md:p-14 shadow-sm text-center">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-text-primary mb-4 tracking-tight">
-          Chron<span className="text-accent-amber">OS</span>
-        </h1>
-        
-        <p className="text-xl text-text-secondary mb-8 leading-relaxed">
-          A calm AI time operating system for turning messy commitments into recovery plans.
-        </p>
-
-        <ul className="text-left max-w-md mx-auto space-y-4 mb-10 text-text-secondary text-sm md:text-base">
-          <li className="flex items-start gap-3">
-            <span className="text-accent-amber font-bold mt-0.5">•</span>
-            <span>Brain dump your commitments into a single structured queue.</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-accent-amber font-bold mt-0.5">•</span>
-            <span>Run agent analysis against your real calendar capacity.</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-accent-amber font-bold mt-0.5">•</span>
-            <span>Approve only the focus blocks and rescue actions you want.</span>
-          </li>
-        </ul>
-
-        {session ? (
-          <Link to="/command" className="inline-block px-8 py-3 text-base font-bold text-white bg-accent-amber rounded-xl hover:bg-accent-terracotta transition-colors shadow-sm w-full sm:w-auto">
-            Open Command
-          </Link>
-        ) : (
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link to="/demo" className="w-full sm:w-auto px-8 py-3 text-base font-bold text-white bg-accent-amber rounded-xl hover:bg-accent-terracotta transition-colors shadow-sm text-center">
-              Try demo
-            </Link>
-            <Link to="/signup" className="w-full sm:w-auto px-8 py-3 text-base font-bold text-text-primary bg-white border border-warm-border rounded-xl hover:bg-warm-ivory transition-colors shadow-sm text-center">
-              Sign up
-            </Link>
-            <Link to="/login" className="w-full sm:w-auto px-8 py-3 text-base font-bold text-text-secondary bg-warm-ivory border border-warm-border rounded-xl hover:bg-warm-border transition-colors shadow-sm text-center">
-              Log in
-            </Link>
-          </div>
-        )}
-
-        <div className="mt-10 pt-6 border-t border-warm-border text-sm">
-          <Link to="/about" className="text-text-muted hover:text-text-primary font-semibold transition-colors">
-            Read the guide →
-          </Link>
-        </div>
-      </main>
-    </div>
-  );
+  return <div className="min-h-screen bg-canvas"><header className="page-container flex h-16 items-center justify-between"><Link to="/" className="text-xl font-semibold">Chron<span className="text-accent">OS</span></Link><nav className="flex items-center gap-4 text-sm font-medium"><Link to="/guide" className="text-muted hover:text-ink">Guide</Link>{session ? <Link className="button-primary" to="/today">Open Today</Link> : <><Link to="/login" className="hidden text-muted hover:text-ink sm:block">Log in</Link><Link className="button-primary" to="/signup">Sign up</Link></>}</nav></header>
+    <main className="page-container py-16 sm:py-24"><section className="mx-auto max-w-4xl text-center"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-strong">Personal planning and execution</p><h1 className="mx-auto mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.03em] sm:text-6xl">Turn scattered commitments into a realistic day.</h1><p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-muted">ChronOS finds a credible next action and quietly helps repair the plan when reality changes.</p><div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row"><Link className="button-primary px-6 py-3" to={session ? '/today' : '/signup'}>{session ? 'Open Today' : 'Start planning'}<ArrowRight className="ml-2 h-4 w-4" /></Link><Link className="button-secondary px-6 py-3" to="/demo">Try guided demo</Link></div></section>
+    <section aria-label="How it works" className="mx-auto mt-20 grid max-w-5xl gap-4 sm:grid-cols-3">{steps.map(({ icon: Icon, title, text }, index) => <article key={title} className="surface p-6 text-left"><div className="flex items-center justify-between"><span className="rounded-xl bg-accent-soft p-2 text-accent-strong"><Icon className="h-5 w-5" /></span><span className="text-xs font-semibold text-faint">0{index + 1}</span></div><h2 className="mt-5 text-lg font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-muted">{text}</p></article>)}</section></main></div>;
 }

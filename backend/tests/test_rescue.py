@@ -43,11 +43,11 @@ def test_select_rescue_strategy_compress(mock_get_layered_capacity):
     assert "minimum_viable_delivery" in payload
     assert payload["confidence_score"] == 60
 
-@patch("google.generativeai.GenerativeModel.generate_content", side_effect=Exception("API Error"))
-def test_gemini_fallback(mock_generate):
+def test_renegotiation_draft_is_deterministic():
     from app.services.rescue_service import generate_renegotiation_draft
     draft = generate_renegotiation_draft("Test Proj", "2024-01-01")
-    assert "request an extension" in draft
+    assert "revised deadline" in draft
+    assert "Test Proj" in draft
     assert "Test Proj" in draft
     assert "2024-01-01" in draft
 

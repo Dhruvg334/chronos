@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from app.api.v1.command import load_judge_demo, run_command_analysis
+from app.api.v1.command import load_sample_scenario, run_command_analysis
 
 
 class _ExecResult:
@@ -142,11 +142,11 @@ def test_run_command_analysis_does_not_fail_when_scheduler_fails(mock_capacity, 
 
 
 @patch("app.api.v1.command.supabase_client")
-def test_load_judge_demo_is_user_scoped_and_cleans_demo_records(mock_supabase):
+def test_load_sample_scenario_is_user_scoped_and_cleans_demo_records(mock_supabase):
     mock_table = _TableChain([])
     mock_supabase.table.return_value = mock_table
 
-    result = load_judge_demo("user123")
+    result = load_sample_scenario("user123")
 
     assert result["status"] == "Demo scenario loaded successfully."
     assert result["commitments_loaded"] == 3

@@ -1,0 +1,151 @@
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any, Sequence, TypeVar
+
+import httpx
+from pydantic import BaseModel, ValidationError
+
+from app.core.errors import ChronosError, ErrorCode
+from app.core.observability import log_event
+from app.models.gateway import (
+    ModelRequest,
+    ModelResponse,
+    ProviderHealth,
+    ProviderStatus,
+    StructuredResponse,
+    ToolDefinition,
+    ToolPlan,
+)
+
+T = TypeVar("T", bound=BaseModel)
+logger = logging.getLogger(__name__)
+
+
+class GroqModelGateway:
+    """Groq implementation over its OpenAI-compatible HTTPS API."""
+
+    def __init__(self, *, api_key: str, base_url: str, models: dict[str, str], timeout: float, max_retries: int):
+        self._api_key = api_key
+        self._base_url = base_url.rstrip("/")
+        self._models = models
+        self._timeout = timeout
+        self._max_retries = max(0, max_retries)
+
+    @classmethod
+    def from_settings(cls, settings):
+        return cls(
+            api_key=settings.GROQ_API_KEY,
+            base_url=settings.GROQ_BASE_URL,
+            models={
+                "fast": settings.GROQ_MODEL_FAST,
+                "reasoning": settings.GROQ_MODEL_REASONING,
+                "tool_use": settings.GROQ_MODEL_TOOL_USE,
+            },
+            timeout=settings.MODEL_REQUEST_TIMEOUT_SECONDS,
+            max_retries=settings.MODEL_MAX_RETRIES,
+        )
+
+    def _model(self, role: str) -> str:
+        model = self._models.get(role) or self._models.get("fast")
+        if not self._api_key or not model:
+            raise ChronosError(ErrorCode.CONFIGURATION, "The model provider is not configured.")
+        return model
+
+    async def _completion(self, request: ModelRequest, *, extra: dict[str, Any] | None = None) -> tuple[dict[str, Any], str]:
+        model = self._model(request.model_role)
+        messages = []
+        if request.system_prompt:
+            messages.append({"role": "system", "content": request.system_prompt})
+        messages.append({"role": "user", "content": request.prompt})
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": request.temperature,
+            "max_completion_tokens": request.max_tokens,
+        }
+        body.update(extra or {})
+        headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
+
+        for attempt in range(self._max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    response = await client.post(f"{self._base_url}/chat/completions", headers=headers, json=body)
+                if response.status_code == 429:
+                    raise ChronosError(ErrorCode.RATE_LIMITED, "The model provider is busy. Try again shortly.")
+                response.raise_for_status()
+                return response.json(), model
+            except ChronosError:
+                raise
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                if attempt >= self._max_retries:
+                    log_event(logger, logging.WARNING, "model_unavailable", provider="groq", exception=type(exc).__name__)
+                    raise ChronosError(ErrorCode.EXTERNAL_UNAVAILABLE, "The model provider is temporarily unavailable.") from exc
+            except (httpx.HTTPStatusError, ValueError) as exc:
+                log_event(logger, logging.ERROR, "model_provider_error", provider="groq", exception=type(exc).__name__)
+                raise ChronosError(ErrorCode.EXTERNAL_UNAVAILABLE, "The model provider could not complete the request.") from exc
+        raise ChronosError(ErrorCode.EXTERNAL_UNAVAILABLE, "The model provider is temporarily unavailable.")
+
+    async def generate_text(self, request: ModelRequest) -> ModelResponse:
+        payload, model = await self._completion(request)
+        try:
+            choice = payload["choices"][0]["message"]
+            return ModelResponse(text=choice.get("content") or "", provider="groq", model=model, request_id=payload.get("id"))
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ChronosError(ErrorCode.MODEL_OUTPUT_INVALID, "The model returned an invalid response.") from exc
+
+    async def generate_structured(self, request: ModelRequest, schema: type[T]) -> StructuredResponse[T]:
+        schema_payload = schema.model_json_schema()
+        current = request
+        for repair_attempt in range(2):
+            payload, model = await self._completion(
+                current,
+                extra={"response_format": {"type": "json_schema", "json_schema": {"name": schema.__name__, "schema": schema_payload}}},
+            )
+            try:
+                raw = payload["choices"][0]["message"]["content"]
+                value = schema.model_validate_json(raw)
+                return StructuredResponse(value=value, provider="groq", model=model, repair_attempts=repair_attempt)
+            except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as exc:
+                if repair_attempt == 1:
+                    log_event(logger, logging.WARNING, "model_validation_failed", schema=schema.__name__, error_count=len(exc.errors()) if isinstance(exc, ValidationError) else 1)
+                    raise ChronosError(ErrorCode.MODEL_OUTPUT_INVALID, "The response needs clarification before it can be used.") from exc
+                current = ModelRequest(
+                    prompt=f"Return a corrected JSON object that satisfies this schema: {json.dumps(schema_payload)}\nOriginal request: {request.prompt}",
+                    system_prompt=request.system_prompt,
+                    model_role="reasoning",
+                    max_tokens=request.max_tokens,
+                    temperature=0,
+                )
+        raise ChronosError(ErrorCode.MODEL_OUTPUT_INVALID, "The response needs clarification before it can be used.")
+
+    async def select_tools(self, request: ModelRequest, tools: Sequence[ToolDefinition]) -> ToolPlan:
+        tool_request = ModelRequest(
+            prompt=request.prompt,
+            system_prompt=request.system_prompt,
+            model_role="tool_use",
+            max_tokens=request.max_tokens,
+            temperature=0,
+        )
+        payload, model = await self._completion(
+            tool_request,
+            extra={"tools": [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.input_schema}} for t in tools], "tool_choice": "auto"},
+        )
+        message = payload.get("choices", [{}])[0].get("message", {})
+        calls = message.get("tool_calls") or []
+        if not calls:
+            return ToolPlan(None, {}, (message.get("content") or "No tool selected.")[:240], "groq", model)
+        call = calls[0].get("function", {})
+        try:
+            arguments = json.loads(call.get("arguments") or "{}")
+        except json.JSONDecodeError as exc:
+            raise ChronosError(ErrorCode.MODEL_OUTPUT_INVALID, "The selected tool arguments were invalid.") from exc
+        return ToolPlan(call.get("name"), arguments, "Selected a bounded tool based on the supplied context.", "groq", model)
+
+    async def health(self) -> ProviderStatus:
+        configured = bool(self._api_key and self._models.get("fast"))
+        return ProviderStatus("groq", ProviderHealth.READY if configured else ProviderHealth.UNCONFIGURED, configured, "configured" if configured else "API key or fast model is missing")
+
+    def metadata(self) -> dict[str, str]:
+        return {"provider": "groq", "fast_model": self._models.get("fast", ""), "reasoning_model": self._models.get("reasoning", ""), "tool_model": self._models.get("tool_use", "")}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evals and Observability"
+  short_description: "Validate traces, logs, errors, and evals"
+  default_prompt: "Use $evals-observability to evaluate this workflow."

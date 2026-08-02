@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
@@ -10,7 +10,7 @@ export function apiUrl(path: string): string {
 }
 
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const session = isSupabaseConfigured ? (await supabase.auth.getSession()).data.session : null;
   const headers = new Headers(init?.headers);
 
   if (session?.access_token) {
@@ -26,6 +26,7 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 export async function getApiErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const data = await response.json();
+    if (typeof data?.error?.message === 'string') return data.error.message;
     if (typeof data?.detail === 'string') return data.detail;
     if (typeof data?.message === 'string') return data.message;
     if (typeof data?.error === 'string') return data.error;

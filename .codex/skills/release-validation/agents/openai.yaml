@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Validation"
+  short_description: "Run complete offline release checks"
+  default_prompt: "Use $release-validation to validate this ChronOS change."

@@ -9,11 +9,15 @@ from app.schemas.intake import (
     ApproveCommitmentsRequest,
     ApproveCommitmentsResponse,
 )
-from app.api.dependencies import get_current_user
-from app.services.gemini_service import gemini_service
+from app.api.dependencies import get_current_user, get_model_gateway, get_repositories
+from app.models.gateway import ModelGateway
+from app.repositories.protocols import RepositorySet
 from app.services.trace_service import AgentTraceLogger, create_agent_run, update_agent_run
 from app.services.risk_service import calculate_initial_risk
-from app.core.database import supabase_client
+from app.core.config import settings
+from app.core.errors import ChronosError
+from app.workflows.intake import IntakeWorkflow
+from app.workflows.runtime import WorkflowRunner
 
 router = APIRouter(prefix="/api/v1/ai/intake", tags=["ai", "intake"])
 
@@ -28,7 +32,7 @@ VALID_COMMITMENT_TYPES = {
     "someday",
 }
 
-PROJECT_LIKE_TYPES = {"project", "milestone", "assignment", "submission", "hackathon", "interview"}
+PROJECT_LIKE_TYPES = {"project", "milestone", "assignment", "deliverable", "interview"}
 
 
 def _normalize_commitment_type(raw_type: Optional[str]) -> str:
@@ -59,10 +63,11 @@ def _json_dt(value):
 
 
 @router.post("", response_model=IntakeResponse)
-async def process_intake(request: BrainDumpRequest, user_id: str = Depends(get_current_user)):
-    from app.core.config import settings
-    if not settings.GEMINI_API_KEY:
-        raise HTTPException(status_code=503, detail="Gemini API Key is not configured on the backend.")
+async def process_intake(
+    request: BrainDumpRequest,
+    user_id: str = Depends(get_current_user),
+    gateway: ModelGateway = Depends(get_model_gateway),
+):
         
     agent_run_id = create_agent_run(user_id, "intake", {"text": request.text})
     if not agent_run_id:
@@ -76,49 +81,44 @@ async def process_intake(request: BrainDumpRequest, user_id: str = Depends(get_c
         explanation="Received brain dump for structured extraction",
     )
 
-    prompt = f'''
-The user has provided a brain dump of things they need to do:
-"{request.text}"
-
-Extract all commitments, tasks, and potential clarifying questions.
-Use only these commitment type values when possible:
-hard_deadline, soft_deadline, event, habit, waiting_on, recurring_obligation, reference, someday.
-Return structured JSON only.
-'''
-
     try:
-        result = gemini_service.extract_structured(
-            prompt,
-            IntakeResponse,
-            require_reasoning=False,
-            trace_logger=trace_logger,
+        workflow = IntakeWorkflow(
+            gateway,
+            WorkflowRunner(
+                max_steps=settings.WORKFLOW_MAX_STEPS,
+                timeout_seconds=settings.WORKFLOW_TIMEOUT_SECONDS,
+                request_budget=settings.WORKFLOW_REQUEST_BUDGET,
+            ),
         )
+        result, workflow_traces = await workflow.extract(user_id=user_id, text=request.text)
         result.agent_run_id = uuid.UUID(agent_run_id)
 
         trace_logger.log(
             "drafts_prepared",
-            {"count": len(result.drafts)},
+            {"count": len(result.drafts), "workflow_steps": len(workflow_traces), "provider": gateway.metadata().get("provider")},
             explanation="Prepared reviewable commitment drafts",
         )
         update_agent_run(agent_run_id, "completed", output_data=result.model_dump(mode="json"))
         return result
-    except Exception as e:
+    except ChronosError as e:
         trace_logger.log(
             "extraction_failed",
-            {"error": str(e)},
+            {"error_code": e.code},
             status="failed",
-            explanation="Gemini extraction or validation failed",
+            explanation="Model extraction or validation failed",
         )
-        update_agent_run(agent_run_id, "failed", error_message=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        update_agent_run(agent_run_id, "failed", error_message=e.code)
+        raise
 
 
 @router.post("/approve", response_model=ApproveCommitmentsResponse)
-async def approve_intake(request: ApproveCommitmentsRequest, user_id: str = Depends(get_current_user)):
+async def approve_intake(
+    request: ApproveCommitmentsRequest,
+    user_id: str = Depends(get_current_user),
+    repositories: RepositorySet = Depends(get_repositories),
+):
     if not request.approved_drafts:
         raise HTTPException(status_code=400, detail="No approved drafts provided.")
-    if not supabase_client:
-        raise HTTPException(status_code=500, detail="Database not initialized.")
 
     agent_run_id = str(request.agent_run_id)
     trace_logger = AgentTraceLogger(user_id, agent_run_id)
@@ -168,7 +168,7 @@ async def approve_intake(request: ApproveCommitmentsRequest, user_id: str = Depe
                 "risk_level": risk_level,
                 "confidence_score": draft.confidence_score,
             }
-            supabase_client.table("commitments").insert(comm_data).execute()
+            repositories.commitments.create(user_id, comm_data)
             trace_logger.log(
                 "commitments_persisted",
                 {"id": commitment_id, "title": draft.title},
@@ -195,7 +195,7 @@ async def approve_intake(request: ApproveCommitmentsRequest, user_id: str = Depe
                         "actual_minutes": 0,
                         "sequence_order": idx,
                     })
-                supabase_client.table("tasks").insert(task_rows).execute()
+                repositories.commitments.create_tasks(user_id, task_rows)
                 trace_logger.log(
                     "tasks_created",
                     {"commitment_id": commitment_id, "count": len(task_rows)},
@@ -229,7 +229,7 @@ async def approve_intake(request: ApproveCommitmentsRequest, user_id: str = Depe
                 "spine_json": checkpoints,
                 "current_stage": "next_action",
             }
-            supabase_client.table("time_spines").insert(spine_data).execute()
+            repositories.commitments.create_time_spine(user_id, spine_data)
             trace_logger.log(
                 "time_spines_created",
                 {"commitment_id": commitment_id},
@@ -253,9 +253,9 @@ async def approve_intake(request: ApproveCommitmentsRequest, user_id: str = Depe
     except Exception as e:
         trace_logger.log(
             "approval_failed",
-            {"error": str(e)},
+            {"error_type": type(e).__name__},
             status="failed",
             explanation="Commitment approval persistence failed",
         )
-        update_agent_run(agent_run_id, "failed", error_message=str(e))
-        raise HTTPException(status_code=500, detail=f"Database insert failed: {str(e)}")
+        update_agent_run(agent_run_id, "failed", error_message=type(e).__name__)
+        raise HTTPException(status_code=503, detail="ChronOS could not save the approved items.")

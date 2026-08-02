@@ -1,105 +1,37 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
-import { useAuth } from '../auth/AuthProvider';
+import { CalendarRange, Inbox, LogOut, Settings, SunMedium } from 'lucide-react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/auth-context';
 
-interface AppShellProps {
-  children: React.ReactNode;
-}
+const primaryItems = [
+  { label: 'Today', path: '/today', icon: SunMedium },
+  { label: 'Inbox', path: '/inbox', icon: Inbox },
+  { label: 'Plan', path: '/plan', icon: CalendarRange },
+];
 
-export default function AppShell({ children }: AppShellProps) {
-  const location = useLocation();
+export default function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { session, signOut } = useAuth();
 
-  const navItems = [
-    { label: 'Command', path: '/command' },
-    { label: 'Inbox', path: '/inbox' },
-    { label: 'Calendar', path: '/calendar' },
-    { label: 'Rescue', path: '/rescue' },
-    { label: 'Reflection', path: '/reflection' },
-    { label: 'Settings', path: '/settings' },
-  ];
-
   return (
-    <div className="min-h-screen bg-warm-ivory text-text-primary flex flex-col font-sans">
-      {/* Centered App Header & Navbar */}
-      <header className="py-6 px-8 flex flex-col md:flex-row justify-between items-center max-w-7xl w-full mx-auto gap-4">
-        <Link to="/" className="text-2xl font-bold tracking-tight">
-          Chron<span className="text-accent-amber">OS</span>
-        </Link>
-        
-        {/* Oval Navbar for protected routes */}
-        {session && (
-          <nav className="bg-white border border-warm-border rounded-full px-6 py-2 shadow-sm flex flex-wrap items-center justify-center gap-4 md:gap-6">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`text-sm font-medium transition ${
-                    isActive
-                      ? 'text-accent-amber font-semibold'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+    <div className="min-h-screen bg-canvas text-ink">
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas/95 backdrop-blur-sm">
+        <div className="page-container flex h-16 items-center justify-between gap-4">
+          <Link to={session ? '/today' : '/'} className="text-xl font-semibold tracking-tight">Chron<span className="text-accent">OS</span></Link>
+          <nav aria-label="Primary navigation" className="fixed inset-x-3 bottom-3 z-30 flex justify-around rounded-2xl border border-line bg-surface p-2 shadow-soft md:static md:inset-auto md:justify-start md:rounded-xl md:shadow-none">
+            {primaryItems.map(({ label, path, icon: Icon }) => (
+              <NavLink key={path} to={path} className={({ isActive }) => `inline-flex min-w-16 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${isActive ? 'bg-accent-soft text-accent-strong' : 'text-muted hover:bg-surface-subtle hover:text-ink'}`}>
+                <Icon className="h-4 w-4" /><span>{label}</span>
+              </NavLink>
+            ))}
           </nav>
-        )}
-
-        {/* Sync indicators and User Actions */}
-        <div className="flex items-center gap-4 text-xs">
-          <Link to="/about" className="text-text-secondary hover:text-text-primary font-semibold transition-colors">
-            Guide
-          </Link>
-
-          {session ? (
-            <>
-              <div className="flex items-center gap-1.5 text-text-secondary bg-white border border-warm-border px-3 py-1.5 rounded-full shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-risk-stable"></span>
-                Health: stable
-              </div>
-              <div className="text-text-muted font-medium truncate max-w-[120px]" title={session.user.email}>
-                {session.user.email}
-              </div>
-              <button
-                onClick={async () => {
-                  await signOut();
-                  navigate('/');
-                }}
-                className="flex items-center gap-1 rounded-full border border-warm-border bg-white px-3 py-1.5 text-text-secondary transition-colors hover:border-risk-atrisk hover:text-risk-atrisk"
-                title="Log out"
-                aria-label="Log out"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
-            </>
-          ) : (
-            <div className="flex items-center gap-4">
-              <Link to="/demo" className="text-text-secondary hover:text-text-primary font-semibold transition-colors">
-                Try demo
-              </Link>
-              <Link to="/login" className="text-text-secondary hover:text-text-primary font-semibold transition-colors">
-                Log in
-              </Link>
-              <Link to="/signup" className="bg-accent-amber text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-accent-terracotta transition-colors shadow-sm">
-                Sign up
-              </Link>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Link to="/guide" className="hidden text-sm font-medium text-muted hover:text-ink sm:block">Guide</Link>
+            <Link to="/settings" aria-label="Settings" className="icon-button"><Settings className="h-4 w-4" /></Link>
+            <button className="icon-button" aria-label="Log out" onClick={async () => { await signOut(); navigate('/'); }}><LogOut className="h-4 w-4" /></button>
+          </div>
         </div>
       </header>
-
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-8 pb-12 flex flex-col">
-        <div className="flex-1 bg-white border border-warm-border rounded-3xl p-4 md:p-8 shadow-sm flex flex-col">
-          {children}
-        </div>
-      </main>
+      <main className="page-container py-6 pb-28 md:py-10 md:pb-12">{children}</main>
     </div>
   );
 }

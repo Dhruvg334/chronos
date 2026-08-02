@@ -148,7 +148,7 @@ def exchange_code_for_token(code: str, state: str) -> None:
 
 def get_connection_status(user_id: str) -> Dict[str, Any]:
     """Return safe connection status without leaking tokens or Vault IDs."""
-    if supabase_client is None:
+    if not supabase_client:
         return {"connected": False}
 
     try:
@@ -175,7 +175,7 @@ def get_connection_status(user_id: str) -> Dict[str, Any]:
 
 def disconnect(user_id: str) -> None:
     """Remove the Google connection and Vault material for the user."""
-    if supabase_client is None:
+    if not supabase_client:
         return
 
     try:
@@ -186,7 +186,7 @@ def disconnect(user_id: str) -> None:
 
 def get_valid_credentials(user_id: str) -> Optional[Credentials]:
     """Retrieve and optionally refresh the credentials for a user."""
-    if supabase_client is None:
+    if not supabase_client:
         return None
 
     try:

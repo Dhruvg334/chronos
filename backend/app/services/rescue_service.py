@@ -3,7 +3,6 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 
 from app.services.capacity_service import get_layered_capacity
-from app.services.gemini_service import gemini_service
 from app.services.scheduling_service import parse_iso
 
 logger = logging.getLogger(__name__)
@@ -68,27 +67,8 @@ def find_rescue_candidates(commitments: List[Dict[str, Any]], user_id: str, tz_s
     return candidates
 
 def generate_renegotiation_draft(commitment_title: str, deadline: str) -> str:
-    """Generate a draft message. Uses Gemini if available, otherwise deterministic."""
-    prompt = (
-        f"Write a short, professional message to renegotiate a deadline for '{commitment_title}'. "
-        f"The current deadline was {deadline}. State that we need an extension due to unforeseen complexities, "
-        f"propose checking in later, and keep it under 3 sentences."
-    )
-    try:
-        # We can just use the generative model directly without schema since we just want text.
-        # Wait, GeminiService.extract_structured expects a pydantic model. 
-        # For simple text, we'll bypass pydantic or just mock it.
-        # Actually, let's just use the raw genai model.
-        import google.generativeai as genai
-        from app.core.config import settings
-        if settings.GEMINI_API_KEY:
-            model = genai.GenerativeModel(model_name=settings.GEMINI_MODEL_FAST)
-            resp = model.generate_content(prompt)
-            return resp.text.strip()
-    except Exception as e:
-        logger.error(f"Gemini draft generation failed: {e}")
-        
-    return f"Hi team, I am writing to formally request an extension on '{commitment_title}'. Due to unforeseen complexity, we will not meet the {deadline} deadline. I will provide a new timeline shortly."
+    """Create a safe editable draft; sending remains outside this phase."""
+    return f"Hi, I need to revisit the timeline for '{commitment_title}' before {deadline}. Could we agree on a revised deadline? I can share a concrete updated plan after we align."
 
 def select_rescue_strategy(commitment: Dict[str, Any], user_id: str, tz_str: str = "UTC") -> Dict[str, Any]:
     """

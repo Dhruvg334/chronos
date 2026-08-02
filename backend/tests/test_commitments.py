@@ -18,7 +18,7 @@ def test_get_commitment_detail(mock_supabase):
     
     mock_comm = {
         "id": mock_comm_id,
-        "title": "Hackathon",
+        "title": "Research proposal",
         "type": "project",
         "status": "active",
         "estimated_minutes": 120,
@@ -48,7 +48,7 @@ def test_get_commitment_detail(mock_supabase):
             res = client.get(f"/api/v1/commitments/{mock_comm_id}")
             assert res.status_code == 200
             data = res.json()
-            assert data["title"] == "Hackathon"
+            assert data["title"] == "Research proposal"
             assert "tasks" in data
             assert "time_spine_stages" in data
             assert "focus_blocks" in data

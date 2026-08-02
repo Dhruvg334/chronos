@@ -2,7 +2,6 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, TypedDict
 
-from langgraph.graph import END, StateGraph
 from postgrest.exceptions import APIError
 
 from app.core.database import supabase_client
@@ -184,23 +183,6 @@ def emit_trace(state: SchedulingState) -> SchedulingState:
     return state
 
 
-workflow = StateGraph(SchedulingState)
-workflow.add_node("load_context", load_context)
-workflow.add_node("rank_commitments", rank_commitments)
-workflow.add_node("generate_candidate_blocks", generate_candidate_blocks_node)
-workflow.add_node("validate_plan", validate_plan)
-workflow.add_node("persist_proposed_actions", persist_proposed_actions)
-workflow.add_node("emit_trace", emit_trace)
-workflow.set_entry_point("load_context")
-workflow.add_edge("load_context", "rank_commitments")
-workflow.add_edge("rank_commitments", "generate_candidate_blocks")
-workflow.add_edge("generate_candidate_blocks", "validate_plan")
-workflow.add_edge("validate_plan", "persist_proposed_actions")
-workflow.add_edge("persist_proposed_actions", "emit_trace")
-workflow.add_edge("emit_trace", END)
-scheduling_graph = workflow.compile()
-
-
 def run_scheduling_graph(user_id: str) -> Dict[str, Any]:
     initial_state: SchedulingState = {
         "user_id": user_id,
@@ -214,4 +196,7 @@ def run_scheduling_graph(user_id: str) -> Dict[str, Any]:
         "agent_run_id": None,
         "error": None,
     }
-    return scheduling_graph.invoke(initial_state)
+    state = initial_state
+    for step in (load_context, rank_commitments, generate_candidate_blocks_node, validate_plan, persist_proposed_actions, emit_trace):
+        state = step(state)
+    return state

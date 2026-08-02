@@ -1,4 +1,3 @@
-import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -6,11 +5,18 @@ class Settings(BaseSettings):
     ENV: str = "development"
     PORT: int = 8000
     
-    # Gemini API Key & Models
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL_FAST: str = "gemini-2.5-flash"
-    GEMINI_MODEL_REASONING: str = "gemini-2.5-pro"
-    GEMINI_MODEL_DEFAULT: str = "gemini-2.5-flash"
+    # Provider-neutral model configuration. Model identifiers never belong in domain code.
+    LLM_PROVIDER: str = "groq"
+    GROQ_API_KEY: str = ""
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_MODEL_FAST: str = ""
+    GROQ_MODEL_REASONING: str = ""
+    GROQ_MODEL_TOOL_USE: str = ""
+    MODEL_REQUEST_TIMEOUT_SECONDS: float = 20.0
+    MODEL_MAX_RETRIES: int = 1
+    WORKFLOW_MAX_STEPS: int = 6
+    WORKFLOW_TIMEOUT_SECONDS: float = 45.0
+    WORKFLOW_REQUEST_BUDGET: int = 4
     
     # Supabase Connection Keys
     SUPABASE_URL: str = ""

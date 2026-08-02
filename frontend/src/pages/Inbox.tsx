@@ -1,98 +1,27 @@
+import { useMutation } from '@tanstack/react-query';
+import { ArrowRight, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { apiUrl, apiFetch as fetch, getApiErrorMessage } from '../lib/api';
 import AppShell from '../components/layout/AppShell';
 import { ExtractionReview } from '../components/intake/ExtractionReview';
+import { PageHeader, Surface } from '../components/ui/primitives';
+import { apiFetch, apiUrl, getApiErrorMessage } from '../lib/api';
 import type { IntakeResponse } from '../types/api';
 
-const MOCK_PROMPTS = {
-  deadline_sprint: "I have a product demo this weekend starting Friday at 6pm and ending Sunday at 2pm. I need to finish the database schema by Saturday morning, build the UI by Saturday night, and prepare the pitch deck on Sunday. I also have a quick 30m sync with my team on Friday at 8pm.",
-  assignment: "I have a massive physics assignment due next Wednesday at midnight. It usually takes me 5 hours total. I also have a quiz on Friday that I need to study 2 hours for. Tomorrow I want to start the assignment and do at least 1 hour.",
-  interview: "I have an interview next Thursday at 10am. I need to do 3 mock interviews (1 hour each) before then. I should also spend 2 hours reviewing system design on Tuesday.",
-  busy_day: "Today is packed. I need to review the Q3 report (takes 1 hr) before my 2pm meeting. I should also respond to emails for 30 mins, and try to squeeze in a 45 min workout before dinner at 7pm."
-};
+const example = 'Finish the authentication regression fix before tomorrow afternoon, review the deployment notes, prepare slides for Monday, attend a team call at 4 PM, and submit my database assignment by Tuesday morning.';
+
+async function extract(text: string): Promise<IntakeResponse> { const response = await apiFetch(apiUrl('/api/v1/ai/intake'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }); if (!response.ok) throw new Error(await getApiErrorMessage(response, 'ChronOS could not review this capture.')); return response.json(); }
 
 export default function Inbox() {
-  const [text, setText] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [intakeData, setIntakeData] = useState<IntakeResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async () => {
-    if (!text.trim()) return;
-    setIsProcessing(true);
-    setError(null);
-    try {
-      const response = await fetch(apiUrl('/api/v1/ai/intake'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
-      });
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'ChronOS could not process this brain dump.'));
-      }
-      const data = await response.json();
-      setIntakeData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'ChronOS could not process this brain dump.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleComplete = () => {
-    setIntakeData(null);
-    setText("");
-    setError('Commitments saved. Open Command to review the plan.');
-  };
-
-  return (
-    <AppShell>
-      <div className="max-w-6xl mx-auto py-8">
-        {!intakeData ? (
-          <>
-            <h2 className="text-3xl font-extrabold text-text-primary mb-2">Brain Dump Intake</h2>
-            <p className="text-text-secondary mb-6">
-              Dump your messy scheduling plans and let ChronOS parse them into structured commitments.
-            </p>
-
-            <div className="bg-warm-cream border border-warm-border rounded-2xl p-6 shadow-sm mb-6">
-              <label className="block text-sm font-semibold text-text-primary mb-3">Messy Week Brain Dump</label>
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="What's on your mind?"
-                rows={6}
-                className="w-full p-4 border border-warm-border rounded-xl bg-white resize-none text-text-primary focus:ring-2 focus:ring-accent-amber focus:outline-none transition-shadow"
-              />
-              
-              <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
-                <span className="text-xs font-semibold text-text-muted self-center mr-2">Quick Prompts:</span>
-                <button onClick={() => setText(MOCK_PROMPTS.deadline_sprint)} className="whitespace-nowrap px-3 py-1.5 bg-warm-ivory hover:bg-warm-border text-text-secondary text-xs font-medium rounded-lg transition-colors">Deadline Sprint</button>
-                <button onClick={() => setText(MOCK_PROMPTS.assignment)} className="whitespace-nowrap px-3 py-1.5 bg-warm-ivory hover:bg-warm-border text-text-secondary text-xs font-medium rounded-lg transition-colors">Assignment Crisis</button>
-                <button onClick={() => setText(MOCK_PROMPTS.interview)} className="whitespace-nowrap px-3 py-1.5 bg-warm-ivory hover:bg-warm-border text-text-secondary text-xs font-medium rounded-lg transition-colors">Interview Prep</button>
-                <button onClick={() => setText(MOCK_PROMPTS.busy_day)} className="whitespace-nowrap px-3 py-1.5 bg-warm-ivory hover:bg-warm-border text-text-secondary text-xs font-medium rounded-lg transition-colors">Busy Day</button>
-              </div>
-
-              <div className="mt-4 flex justify-between items-center border-t border-warm-border pt-4">
-                {error ? <span className="text-sm text-risk-critical">{error}</span> : <div></div>}
-                <button 
-                  onClick={handleSubmit} 
-                  disabled={isProcessing || !text.trim()} 
-                  className="px-6 py-2.5 bg-accent-amber hover:bg-accent-terracotta disabled:bg-warm-border disabled:cursor-not-allowed text-white font-semibold rounded-lg text-sm shadow-sm transition-colors"
-                >
-                  {isProcessing ? 'Compiling…' : 'Compile commitments'}
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <ExtractionReview 
-            agentRunId={intakeData.agent_run_id} 
-            initialDrafts={intakeData.drafts} 
-            onComplete={handleComplete} 
-          />
-        )}
-      </div>
-    </AppShell>
-  );
+  const [text, setText] = useState('');
+  const [data, setData] = useState<IntakeResponse | null>(null);
+  const [saved, setSaved] = useState(false);
+  const mutation = useMutation({ mutationFn: extract, onSuccess: result => setData(result) });
+  if (data) return <AppShell><PageHeader eyebrow="Inbox" title="Review only what needs judgment" description="Confirm uncertain details and approve only the drafts you want to save." /><ExtractionReview agentRunId={data.agent_run_id} initialDrafts={data.drafts} onComplete={() => { setData(null); setText(''); setSaved(true); }} /></AppShell>;
+  return <AppShell><PageHeader eyebrow="Inbox" title="Capture what’s on your mind" description="Start with plain language. ChronOS prepares reviewable drafts and keeps uncertainty visible." />
+    <Surface className="mx-auto max-w-3xl p-5 sm:p-7"><label className="label" htmlFor="capture">Commitments, tasks, meetings, or loose ends</label><textarea id="capture" className="field min-h-44 resize-y text-base leading-7" value={text} onChange={event => setText(event.target.value)} placeholder="For example: I need to finish the auth fix before tomorrow afternoon…" />
+      <div className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between"><button className="text-left font-medium text-accent-strong hover:underline" onClick={() => setText(example)}>Use an example</button><button className="button-primary" disabled={!text.trim() || mutation.isPending} onClick={() => mutation.mutate(text)}>{mutation.isPending ? 'Reviewing…' : 'Review capture'}<ArrowRight className="ml-2 h-4 w-4" /></button></div>
+      {mutation.isError && <div role="alert" className="mt-4 flex items-start justify-between gap-4 rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger"><span>{mutation.error instanceof Error ? mutation.error.message : 'ChronOS could not review this capture.'}</span><button className="inline-flex shrink-0 items-center gap-1 font-semibold" onClick={() => mutation.mutate(text)}><RotateCcw className="h-3.5 w-3.5" />Retry</button></div>}
+      {saved && <p role="status" className="mt-4 rounded-xl bg-success-soft p-4 text-sm text-success">Approved commitments were saved. Open Today to review the next action.</p>}
+    </Surface>
+  </AppShell>;
 }
