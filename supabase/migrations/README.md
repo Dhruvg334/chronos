@@ -32,6 +32,9 @@ This directory holds the PostgreSQL migration files. They must be executed in th
 13. `013_create_user_memory.sql`
     - Stores overrun factors and planning coefficients.
 
+14-19. Security, compatibility, and lifecycle migrations
+    - Preserve grants and Vault-backed Google tokens, add active focus and planning action enum values, and add durable focus pause/resume timing.
+
 ## System-Wide Trigger functions
 All migration scripts will incorporate:
 - Row-Level Security policies restricting reads/writes using `USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)`.

@@ -2,20 +2,24 @@
 
 ## Show the next decision
 
-Today answers what matters, what to do next, whether the plan fits, what changed, and whether approval is waiting. Default views show one status, one next action, one ordered plan, and at most one primary strategy recommendation.
+Today uses one consolidated server response. It shows one status, one next meaningful action, one primary focus control, an ordered plan, attention and approval counts, and at most one backend-selected strategy recommendation.
 
 ## Keep capture light
 
-Inbox begins with one plain-language input. Ask only for missing information that materially changes the plan. Keep extraction uncertainty visible and persist only approved drafts.
+Inbox begins with one plain-language input. Extraction preserves uncertainty, presents separate drafts for review, and persists only drafts the user explicitly approves.
 
 ## Make time concrete
 
-Plan combines calendar events, plan blocks, unscheduled work, capacity, and buffers. Validate overlaps and transition time deterministically.
+Plan combines cached calendar events, plan blocks, unscheduled active commitments, available capacity, and buffer guidance. Adding a block requires commitment, start time, and duration; overlap and capacity errors remain visible and actionable.
+
+## Keep execution contextual
+
+Focus opens from Today and exposes duration, elapsed/remaining time, pause, resume, finish, stop with reason, and stuck options. Reflection appears while finishing or after stopping. Recovery appears only when risk makes it relevant. Neither is permanent primary navigation.
 
 ## Explain consequences
 
-Recommendations state why they apply, evidence used, the proposed action, the trade-off, and whether data changes automatically. Avoid motivational filler and hidden automation.
+Strategy and recovery recommendations state why they apply, evidence, confidence, action, trade-off, and that no automatic change occurs. Plan mutation waits for explicit approval.
 
 ## Visual foundation
 
-Use warm neutral canvas colors, white working surfaces, restrained copper accents, strong contrast, minimal shadows, consistent spacing/radii, and visible keyboard focus. Do not use glass effects, dense dashboard mosaics, or a permanent chat panel.
+Use semantic warm-canvas, surface, line, ink, muted, accent, success, and danger tokens; visible focus; responsive layout; and bottom navigation. Do not display an enabled control without implemented behavior.

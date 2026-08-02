@@ -1,131 +1,41 @@
-from datetime import datetime, timezone
-from typing import Optional
+from __future__ import annotations
+
 import uuid
-import logging
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends
 
-from app.core.database import supabase_client
-from app.core.observability import log_event
-from app.api.dependencies import get_current_user
-from app.services.risk_service import recalculate_commitment_risk
-from app.services.time_spine_service import advance_time_spine_stage, get_time_spine_view
-from app.services.trace_service import AgentTraceLogger, create_agent_run, update_agent_run
+from app.api.dependencies import get_current_user, get_repositories
+from app.core.errors import ChronosError, ErrorCode
+from app.repositories.protocols import RepositorySet
+from app.schemas.core import ReflectionRequest
+from app.services.core_journey import observed_risk
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
-
-
-class CreateReflectionRequest(BaseModel):
-    commitment_id: str
-    focus_block_id: Optional[str] = None
-    planned_minutes: int = Field(..., ge=0)
-    actual_minutes: int = Field(..., ge=0)
-    completion_status: str
-    energy_level: int = Field(..., ge=1, le=5)
-    blocker_reason: Optional[str] = None
-    quality_confidence: Optional[str] = None
-    notes: Optional[str] = None
-    progress_percent_update: Optional[float] = Field(default=None, ge=0, le=100)
-
-
-def _require_db():
-    if not supabase_client:
-        raise HTTPException(status_code=500, detail="Database not initialized")
-
-
-def _log_activity(user_id: str, step_name: str, explanation: str, payload: dict) -> None:
-    if not supabase_client:
-        return
-    try:
-        run_id = create_agent_run(user_id, "user_activity", payload)
-        if not run_id:
-            return
-        AgentTraceLogger(user_id, run_id).log(step_name, payload, explanation=explanation)
-        update_agent_run(run_id, "completed", output_data={"step_name": step_name})
-    except Exception as exc:
-        log_event(logger, logging.WARNING, "activity_trace_failed", step=step_name, exception=type(exc).__name__)
 
 
 @router.post("")
-async def submit_reflection(request: CreateReflectionRequest, user_id: str = Depends(get_current_user)):
-    _require_db()
-
-    comm_res = (
-        supabase_client.table("commitments")
-        .select("*")
-        .eq("id", request.commitment_id)
-        .eq("user_id", user_id)
-        .single()
-        .execute()
-    )
-    if not comm_res.data:
-        raise HTTPException(status_code=404, detail="Commitment not found")
-
-    if request.focus_block_id:
-        block_res = (
-            supabase_client.table("focus_blocks")
-            .select("id")
-            .eq("id", request.focus_block_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
-        if not block_res.data:
-            raise HTTPException(status_code=404, detail="Focus block not found")
-
-    commitment = comm_res.data
-    reflection_data = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "commitment_id": request.commitment_id,
-        "focus_block_id": request.focus_block_id,
-        "planned_minutes": request.planned_minutes,
-        "actual_minutes": request.actual_minutes,
-        "completion_status": request.completion_status,
-        "energy_level": request.energy_level,
-        "blocker_reason": request.blocker_reason,
-        "quality_confidence": request.quality_confidence,
-        "notes": request.notes,
-    }
-    refl_res = supabase_client.table("reflections").insert(reflection_data).execute()
-
-    new_actual = int(commitment.get("actual_minutes") or 0) + request.actual_minutes
-    new_progress = (
-        float(request.progress_percent_update)
-        if request.progress_percent_update is not None
-        else float(commitment.get("progress_percent") or 0.0)
-    )
-
-    commitment_for_risk = {**commitment, "actual_minutes": new_actual, "progress_percent": new_progress}
-    new_score, new_level = recalculate_commitment_risk(commitment_for_risk, current_time=datetime.now(timezone.utc))
-
-    updated_comm = (
-        supabase_client.table("commitments")
-        .update({
-            "actual_minutes": new_actual,
-            "progress_percent": new_progress,
-            "risk_score": new_score,
-            "risk_level": new_level,
-        })
-        .eq("id", request.commitment_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-
-    advance_time_spine_stage(request.commitment_id, user_id, event_type="reflection_submitted")
-    time_spine = get_time_spine_view(request.commitment_id, user_id)
-
-    _log_activity(
-        user_id,
-        "reflection_submitted",
-        f"Reflection submitted. Progress {new_progress}%. Risk: {new_level}.",
-        {"commitment_id": request.commitment_id, "reflection_id": reflection_data["id"]},
-    )
-
-    return {
-        "reflection": refl_res.data[0],
-        "commitment": updated_comm.data[0],
-        "risk": {"risk_score": new_score, "risk_level": new_level},
-        "time_spine": time_spine,
-    }
+async def submit_reflection(request: ReflectionRequest, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    commitment = repositories.commitments.get_for_user(user_id, request.commitment_id)
+    if not commitment:
+        raise ChronosError(ErrorCode.VALIDATION, "Commitment not found.")
+    if request.focus_block_id and not repositories.focus.get_for_user(user_id, request.focus_block_id):
+        raise ChronosError(ErrorCode.VALIDATION, "Focus session not found.")
+    reflection = repositories.reflections.create(user_id, {
+        "id": str(uuid.uuid4()), "commitment_id": request.commitment_id, "focus_block_id": request.focus_block_id,
+        "planned_minutes": request.planned_minutes, "actual_minutes": request.actual_minutes,
+        "completion_status": request.completion_status, "energy_level": request.energy_level,
+        "blocker_reason": request.blocker_reason, "notes": request.notes,
+    })
+    actual = int(commitment.get("actual_minutes") or 0) + request.actual_minutes
+    progress = request.progress_percent if request.progress_percent is not None else int(commitment.get("progress_percent") or 0)
+    risk_score, risk_level = observed_risk(commitment, progress_percent=progress, skipped=request.completion_status == "skipped")
+    updated = repositories.commitments.update(user_id, request.commitment_id, {"actual_minutes": actual, "progress_percent": progress, "risk_score": risk_score, "risk_level": risk_level})
+    spine = repositories.commitments.get_time_spine(user_id, request.commitment_id)
+    if spine:
+        stages = list(spine.get("spine_json") or [])
+        for stage in stages:
+            if stage.get("id") == "reflection":
+                stage["status"] = "completed"
+        spine = repositories.commitments.update_time_spine(user_id, request.commitment_id, {"spine_json": stages, "current_stage": "reflection"})
+    return {"reflection": reflection, "commitment": updated, "risk": {"risk_score": risk_score, "risk_level": risk_level}, "time_spine": spine}

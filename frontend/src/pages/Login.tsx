@@ -86,15 +86,15 @@ export default function Login() {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-warm-ivory p-4">
-      <div className="w-full max-w-md bg-white border border-warm-border rounded-2xl shadow-sm p-8">
+    <div className="flex h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md bg-surface border border-line rounded-2xl shadow-sm p-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-extrabold text-text-primary mb-2">Welcome Back</h1>
-          <p className="text-text-secondary">Log in to ChronOS to manage your commitments.</p>
+          <h1 className="text-2xl font-extrabold text-ink mb-2">Welcome Back</h1>
+          <p className="text-muted">Log in to ChronOS to manage your commitments.</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-50 border border-risk-atrisk text-risk-atrisk text-sm rounded-lg flex items-start gap-2">
+          <div className="mb-6 p-3 bg-danger-soft border border-danger text-danger text-sm rounded-lg flex items-start gap-2">
             <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
@@ -103,10 +103,10 @@ export default function Login() {
         <button
           onClick={handleGoogleLogin}
           disabled={isGoogleLoading || isLoading}
-          className="w-full flex items-center justify-center gap-3 bg-white border border-warm-border text-text-primary py-2.5 rounded-lg font-semibold hover:bg-warm-ivory transition-colors disabled:opacity-50 mb-6"
+          className="w-full flex items-center justify-center gap-3 bg-surface border border-line text-ink py-2.5 rounded-lg font-semibold hover:bg-canvas transition-colors disabled:opacity-50 mb-6"
         >
           {isGoogleLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-text-muted" />
+            <Loader2 className="w-5 h-5 animate-spin text-faint" />
           ) : (
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -120,31 +120,31 @@ export default function Login() {
 
         <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-warm-border"></div>
+            <div className="w-full border-t border-line"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-text-muted">Or continue with email</span>
+            <span className="px-2 bg-surface text-faint">Or continue with email</span>
           </div>
         </div>
 
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-text-secondary mb-1">Email</label>
+            <label className="block text-sm font-semibold text-muted mb-1">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-warm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-amber text-text-primary"
+              className="w-full px-4 py-2 bg-surface border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-ink"
               placeholder="you@example.com"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-text-secondary mb-1">Password</label>
+            <label className="block text-sm font-semibold text-muted mb-1">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-warm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-amber text-text-primary"
+              className="w-full px-4 py-2 bg-surface border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-ink"
               placeholder="••••••••"
             />
           </div>
@@ -152,16 +152,16 @@ export default function Login() {
           <button
             type="submit"
             disabled={isLoading || isGoogleLoading}
-            className="w-full flex items-center justify-center gap-2 bg-accent-amber text-white py-2.5 rounded-lg font-semibold hover:bg-accent-terracotta transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-accent text-white py-2.5 rounded-lg font-semibold hover:bg-accent-strong transition-colors disabled:opacity-50"
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             Log in
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-text-secondary">
+        <div className="mt-6 text-center text-sm text-muted">
           Don't have an account?{' '}
-          <Link to="/signup" className="text-accent-amber font-semibold hover:underline">
+          <Link to="/signup" className="text-accent-strong font-semibold hover:underline">
             Sign up
           </Link>
         </div>

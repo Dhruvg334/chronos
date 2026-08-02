@@ -166,3 +166,59 @@ export interface CapacityAvailability {
   fallback_reason?: string;
 }
 
+export interface StrategyRecommendation {
+  strategy: string;
+  title: string;
+  why: string;
+  evidence: string[];
+  action: string;
+  tradeoff: string;
+  automatic_change: false;
+  confidence: 'low' | 'medium' | 'high';
+  alternatives: string[];
+}
+
+export interface PlanItem {
+  id: string;
+  kind: 'calendar_event' | 'focus_block' | 'commitment';
+  title: string;
+  start_at?: string | null;
+  end_at?: string | null;
+  commitment_id?: string | null;
+  status: string;
+}
+
+export interface ActiveFocusSession {
+  id: string;
+  commitment_id: string;
+  title: string;
+  status: 'active' | 'paused';
+  planned_minutes: number;
+  elapsed_seconds: number;
+  remaining_seconds: number;
+  started_at: string;
+  paused_at?: string | null;
+}
+
+export interface TodayResponse {
+  status: 'clear' | 'attention' | 'empty';
+  status_message: string;
+  next_action: { commitment_id: string; task_id?: string | null; title: string; detail: string; estimated_minutes: number } | null;
+  ordered_plan: PlanItem[];
+  attention_count: number;
+  strategy_recommendation: StrategyRecommendation | null;
+  pending_approval_count: number;
+  active_focus_session: ActiveFocusSession | null;
+  recovery: { commitment_id: string; title: string; reason: string; options: string[]; requires_approval: true } | null;
+}
+
+export interface PlanResponse {
+  range_start: string;
+  range_end: string;
+  calendar_events: PlanItem[];
+  plan_blocks: PlanItem[];
+  unscheduled_commitments: PlanItem[];
+  ordered_timeline: PlanItem[];
+  capacity: { total_minutes: number; busy_minutes: number; planned_minutes: number; buffer_minutes: number; available_minutes: number };
+  buffer_guidance: string;
+}

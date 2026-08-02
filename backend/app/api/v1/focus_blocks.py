@@ -1,19 +1,26 @@
-from datetime import datetime, timezone
-from typing import Optional
+from __future__ import annotations
+
 import uuid
-import logging
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
-from app.core.database import supabase_client
-from app.api.dependencies import get_current_user
-from app.services.risk_service import recalculate_commitment_risk
-from app.services.time_spine_service import advance_time_spine_stage, get_time_spine_view
-from app.services.trace_service import AgentTraceLogger, create_agent_run, update_agent_run
+from app.api.dependencies import get_current_user, get_repositories
+from app.core.errors import ChronosError, ErrorCode
+from app.repositories.protocols import RepositorySet
+from app.schemas.core import CompleteFocusRequest, FocusSessionResponse, StartFocusRequest, StopFocusRequest, StuckResponse
+from app.services.core_journey import focus_view, observed_risk, parse_datetime
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+
+STUCK_OPTIONS = (
+    "Define a smaller next step",
+    "Identify missing information",
+    "Switch to a short setup action",
+    "Request a recovery suggestion",
+)
 
 
 class CreateFocusBlockRequest(BaseModel):
@@ -29,312 +36,156 @@ class UpdateFocusBlockRequest(BaseModel):
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     block_type: Optional[str] = None
-    status: Optional[str] = None
 
 
-class CompleteFocusBlockRequest(BaseModel):
-    actual_minutes: int = Field(..., ge=0)
-    completion_status: str
-    energy_level: int = Field(..., ge=1, le=5)
-    quality_confidence: Optional[str] = None
-    blocker_reason: Optional[str] = None
-    notes: Optional[str] = None
-    progress_percent_update: Optional[float] = Field(default=None, ge=0, le=100)
+def _get_block(repositories: RepositorySet, user_id: str, block_id: str) -> dict:
+    block = repositories.focus.get_for_user(user_id, block_id)
+    if not block:
+        raise ChronosError(ErrorCode.VALIDATION, "Focus session not found.")
+    return block
 
 
-class SkipFocusBlockRequest(BaseModel):
-    reason: str
-    blocker_reason: Optional[str] = None
-    notes: Optional[str] = None
-
-
-def _require_db():
-    if not supabase_client:
-        raise HTTPException(status_code=500, detail="Database not initialized")
-
-
-def _create_activity_trace(user_id: str, step_name: str, explanation: str, payload: Optional[dict] = None) -> None:
-    """Persist a user-activity trace without tying focus lifecycle actions to a real AI run."""
-    if not supabase_client:
-        return
-    try:
-        run_id = create_agent_run(user_id, "user_activity", payload or {"step_name": step_name})
-        if not run_id:
-            return
-        AgentTraceLogger(user_id, run_id).log(
-            step_name,
-            payload or {},
-            status="succeeded",
-            explanation=explanation,
-        )
-        update_agent_run(run_id, "completed", output_data={"step_name": step_name})
-    except Exception as exc:  # Activity logs should not break user actions.
-        logger.warning("Failed to write activity trace %s: %s", step_name, exc)
-
-
-def _planned_minutes(block: dict) -> int:
-    start_at = datetime.fromisoformat(str(block["start_at"]).replace("Z", "+00:00"))
-    end_at = datetime.fromisoformat(str(block["end_at"]).replace("Z", "+00:00"))
-    return max(0, int((end_at - start_at).total_seconds() // 60))
+def _advance_spine(repositories: RepositorySet, user_id: str, commitment_id: str) -> dict | None:
+    spine = repositories.commitments.get_time_spine(user_id, commitment_id)
+    if not spine:
+        return None
+    stages = list(spine.get("spine_json") or [])
+    for stage in stages:
+        if stage.get("id") == "next_action":
+            stage["status"] = "completed"
+    return repositories.commitments.update_time_spine(user_id, commitment_id, {"spine_json": stages, "current_stage": "reflection"})
 
 
 @router.get("", response_model=list[dict])
-async def get_focus_blocks(user_id: str = Depends(get_current_user)):
-    _require_db()
-    res = (
-        supabase_client.table("focus_blocks")
-        .select("*")
-        .eq("user_id", user_id)
-        .order("start_at", desc=True)
-        .execute()
-    )
-    return res.data or []
+async def get_focus_blocks(user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    return repositories.focus.list_for_user(user_id)
+
+
+@router.post("/start", response_model=FocusSessionResponse)
+async def start_contextual_focus(request: StartFocusRequest, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    if repositories.focus.get_active(user_id):
+        raise ChronosError(ErrorCode.CONFLICT, "Finish or stop the active focus session before starting another.")
+    commitment = repositories.commitments.get_for_user(user_id, request.commitment_id)
+    if not commitment:
+        raise ChronosError(ErrorCode.VALIDATION, "Commitment not found.")
+    now = datetime.now(timezone.utc)
+    block = repositories.focus.create(user_id, {
+        "id": str(uuid.uuid4()),
+        "commitment_id": request.commitment_id,
+        "title": request.title or str(commitment["title"]),
+        "start_at": now.isoformat(),
+        "end_at": (now + timedelta(minutes=request.duration_minutes)).isoformat(),
+        "block_type": "deep_work",
+        "status": "active",
+        "started_at": now.isoformat(),
+        "accumulated_pause_seconds": 0,
+    })
+    return FocusSessionResponse(session=focus_view(block, now=now))
 
 
 @router.post("")
-async def create_focus_block(request: CreateFocusBlockRequest, user_id: str = Depends(get_current_user)):
-    _require_db()
-
-    comm_res = (
-        supabase_client.table("commitments")
-        .select("id,title")
-        .eq("id", request.commitment_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-    if not comm_res.data:
-        raise HTTPException(status_code=404, detail="Commitment not found")
-
-    block_data = {
+async def create_focus_block(request: CreateFocusBlockRequest, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    if request.end_at <= request.start_at:
+        raise ChronosError(ErrorCode.VALIDATION, "Focus block end time must be after its start time.")
+    if not repositories.commitments.get_for_user(user_id, request.commitment_id):
+        raise ChronosError(ErrorCode.VALIDATION, "Commitment not found.")
+    return repositories.focus.create(user_id, {
         "id": str(uuid.uuid4()),
-        "user_id": user_id,
         "commitment_id": request.commitment_id,
         "title": request.title,
         "start_at": request.start_at.isoformat(),
         "end_at": request.end_at.isoformat(),
         "block_type": request.block_type,
         "status": "scheduled",
-    }
-
-    res = supabase_client.table("focus_blocks").insert(block_data).execute()
-    _create_activity_trace(
-        user_id,
-        "focus_block_created",
-        f"Created focus block '{request.title}'.",
-        {"commitment_id": request.commitment_id, "focus_block_id": block_data["id"]},
-    )
-    return res.data[0]
+    })
 
 
 @router.patch("/{block_id}")
-async def update_focus_block(block_id: str, request: UpdateFocusBlockRequest, user_id: str = Depends(get_current_user)):
-    _require_db()
-    update_data = request.model_dump(exclude_none=True)
-    if "start_at" in update_data and update_data["start_at"] is not None:
-        update_data["start_at"] = update_data["start_at"].isoformat()
-    if "end_at" in update_data and update_data["end_at"] is not None:
-        update_data["end_at"] = update_data["end_at"].isoformat()
-
-    if not update_data:
-        raise HTTPException(status_code=400, detail="No update fields provided")
-
-    res = (
-        supabase_client.table("focus_blocks")
-        .update(update_data)
-        .eq("id", block_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Focus block not found")
-    return res.data[0]
+async def update_focus_block(block_id: str, request: UpdateFocusBlockRequest, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    update = request.model_dump(exclude_none=True)
+    if not update:
+        raise ChronosError(ErrorCode.VALIDATION, "No update fields were provided.")
+    if isinstance(update.get("start_at"), datetime):
+        update["start_at"] = update["start_at"].isoformat()
+    if isinstance(update.get("end_at"), datetime):
+        update["end_at"] = update["end_at"].isoformat()
+    return repositories.focus.update(user_id, block_id, update)
 
 
-@router.post("/{block_id}/start")
-async def start_focus_block(block_id: str, user_id: str = Depends(get_current_user)):
-    _require_db()
-
-    res = (
-        supabase_client.table("focus_blocks")
-        .update({"status": "active"})
-        .eq("id", block_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Focus block not found")
-
-    _create_activity_trace(
-        user_id,
-        "focus_block_started",
-        f"Started focus block '{res.data[0].get('title')}'.",
-        {"focus_block_id": block_id, "commitment_id": res.data[0].get("commitment_id")},
-    )
-    return res.data[0]
+@router.post("/{block_id}/start", response_model=FocusSessionResponse)
+async def start_focus_block(block_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    existing = repositories.focus.get_active(user_id)
+    if existing and str(existing["id"]) != block_id:
+        raise ChronosError(ErrorCode.CONFLICT, "Finish or stop the active focus session before starting another.")
+    block = _get_block(repositories, user_id, block_id)
+    now = datetime.now(timezone.utc)
+    updated = repositories.focus.update(user_id, block_id, {"status": "active", "started_at": block.get("started_at") or now.isoformat(), "paused_at": None})
+    return FocusSessionResponse(session=focus_view(updated, now=now))
 
 
-@router.post("/{block_id}/complete")
-async def complete_focus_block(block_id: str, request: CompleteFocusBlockRequest, user_id: str = Depends(get_current_user)):
-    _require_db()
+@router.post("/{block_id}/pause", response_model=FocusSessionResponse)
+async def pause_focus_block(block_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    block = _get_block(repositories, user_id, block_id)
+    if block.get("status") != "active":
+        raise ChronosError(ErrorCode.CONFLICT, "Only an active focus session can be paused.")
+    now = datetime.now(timezone.utc)
+    updated = repositories.focus.update(user_id, block_id, {"status": "paused", "paused_at": now.isoformat()})
+    return FocusSessionResponse(session=focus_view(updated, now=now))
 
-    block_res = (
-        supabase_client.table("focus_blocks")
-        .select("*")
-        .eq("id", block_id)
-        .eq("user_id", user_id)
-        .single()
-        .execute()
-    )
-    if not block_res.data:
-        raise HTTPException(status_code=404, detail="Focus block not found")
 
-    block = block_res.data
+@router.post("/{block_id}/resume", response_model=FocusSessionResponse)
+async def resume_focus_block(block_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    block = _get_block(repositories, user_id, block_id)
+    if block.get("status") != "paused" or not block.get("paused_at"):
+        raise ChronosError(ErrorCode.CONFLICT, "Only a paused focus session can be resumed.")
+    now = datetime.now(timezone.utc)
+    paused_seconds = max(0, int((now - parse_datetime(block["paused_at"])).total_seconds()))
+    updated = repositories.focus.update(user_id, block_id, {"status": "active", "paused_at": None, "accumulated_pause_seconds": int(block.get("accumulated_pause_seconds") or 0) + paused_seconds})
+    return FocusSessionResponse(session=focus_view(updated, now=now))
+
+
+@router.post("/{block_id}/stuck", response_model=StuckResponse)
+async def focus_stuck(block_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    block = _get_block(repositories, user_id, block_id)
+    if block.get("status") not in {"active", "paused"}:
+        raise ChronosError(ErrorCode.CONFLICT, "Stuck guidance is available during an active focus session.")
+    return StuckResponse(focus_block_id=block_id, options=STUCK_OPTIONS, recovery_available=True)
+
+
+@router.post("/{block_id}/complete", response_model=FocusSessionResponse)
+async def complete_focus_block(request: CompleteFocusRequest, block_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    block = _get_block(repositories, user_id, block_id)
     commitment_id = block.get("commitment_id")
-    if not commitment_id:
-        raise HTTPException(status_code=400, detail="Focus block is not linked to a commitment")
-
-    comm_res = (
-        supabase_client.table("commitments")
-        .select("*")
-        .eq("id", commitment_id)
-        .eq("user_id", user_id)
-        .single()
-        .execute()
-    )
-    if not comm_res.data:
-        raise HTTPException(status_code=404, detail="Commitment not found")
-    commitment = comm_res.data
-
-    updated_block_res = (
-        supabase_client.table("focus_blocks")
-        .update({"status": "completed"})
-        .eq("id", block_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-
-    planned_minutes = _planned_minutes(block)
-    reflection_data = {
+    commitment = repositories.commitments.get_for_user(user_id, commitment_id) if commitment_id else None
+    if not commitment:
+        raise ChronosError(ErrorCode.VALIDATION, "The focus session is not linked to an available commitment.")
+    updated_block = repositories.focus.update(user_id, block_id, {"status": "completed", "paused_at": None})
+    planned = max(0, int((parse_datetime(block["end_at"]) - parse_datetime(block["start_at"])).total_seconds() // 60))
+    reflection = repositories.reflections.create(user_id, {
         "id": str(uuid.uuid4()),
-        "user_id": user_id,
         "commitment_id": commitment_id,
         "focus_block_id": block_id,
-        "planned_minutes": planned_minutes,
+        "planned_minutes": planned,
         "actual_minutes": request.actual_minutes,
         "completion_status": request.completion_status,
         "energy_level": request.energy_level,
         "blocker_reason": request.blocker_reason,
-        "quality_confidence": request.quality_confidence,
         "notes": request.notes,
-    }
-    refl_res = supabase_client.table("reflections").insert(reflection_data).execute()
-
-    new_actual = int(commitment.get("actual_minutes") or 0) + request.actual_minutes
-    new_progress = (
-        float(request.progress_percent_update)
-        if request.progress_percent_update is not None
-        else float(commitment.get("progress_percent") or 0.0)
-    )
-
-    commitment_for_risk = {**commitment, "actual_minutes": new_actual, "progress_percent": new_progress}
-    new_score, new_level = recalculate_commitment_risk(commitment_for_risk, current_time=datetime.now(timezone.utc))
-
-    updated_comm = (
-        supabase_client.table("commitments")
-        .update({
-            "actual_minutes": new_actual,
-            "progress_percent": new_progress,
-            "risk_score": new_score,
-            "risk_level": new_level,
-        })
-        .eq("id", commitment_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-
-    advance_time_spine_stage(commitment_id, user_id, event_type="focus_completed")
-    time_spine = get_time_spine_view(commitment_id, user_id)
-
-    _create_activity_trace(
-        user_id,
-        "focus_block_completed",
-        f"Completed focus block for {request.actual_minutes}m. Progress {new_progress}%. Risk: {new_level}.",
-        {"focus_block_id": block_id, "commitment_id": commitment_id, "reflection_id": reflection_data["id"]},
-    )
-
-    return {
-        "focus_block": updated_block_res.data[0] if updated_block_res.data else {**block, "status": "completed"},
-        "reflection": refl_res.data[0],
-        "commitment": updated_comm.data[0],
-        "risk": {"risk_score": new_score, "risk_level": new_level},
-        "time_spine": time_spine,
-    }
+    })
+    actual = int(commitment.get("actual_minutes") or 0) + request.actual_minutes
+    risk_score, risk_level = observed_risk(commitment, progress_percent=request.progress_percent)
+    repositories.commitments.update(user_id, commitment_id, {"actual_minutes": actual, "progress_percent": request.progress_percent, "risk_score": risk_score, "risk_level": risk_level})
+    _advance_spine(repositories, user_id, commitment_id)
+    return FocusSessionResponse(session=None, reflection=reflection, reflection_requested=False)
 
 
-@router.post("/{block_id}/skip")
-async def skip_focus_block(block_id: str, request: SkipFocusBlockRequest, user_id: str = Depends(get_current_user)):
-    _require_db()
-
-    block_res = (
-        supabase_client.table("focus_blocks")
-        .select("*")
-        .eq("id", block_id)
-        .eq("user_id", user_id)
-        .single()
-        .execute()
-    )
-    if not block_res.data:
-        raise HTTPException(status_code=404, detail="Focus block not found")
-
-    block = block_res.data
+@router.post("/{block_id}/skip", response_model=FocusSessionResponse)
+async def skip_focus_block(request: StopFocusRequest, block_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    block = _get_block(repositories, user_id, block_id)
     commitment_id = block.get("commitment_id")
-    if not commitment_id:
-        raise HTTPException(status_code=400, detail="Focus block is not linked to a commitment")
-
-    comm_res = (
-        supabase_client.table("commitments")
-        .select("*")
-        .eq("id", commitment_id)
-        .eq("user_id", user_id)
-        .single()
-        .execute()
-    )
-    if not comm_res.data:
-        raise HTTPException(status_code=404, detail="Commitment not found")
-    commitment = comm_res.data
-
-    updated_block_res = (
-        supabase_client.table("focus_blocks")
-        .update({"status": "skipped"})
-        .eq("id", block_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-
-    new_score, new_level = recalculate_commitment_risk(
-        commitment,
-        current_time=datetime.now(timezone.utc),
-        skip_penalty=True,
-    )
-
-    updated_comm = (
-        supabase_client.table("commitments")
-        .update({"risk_score": new_score, "risk_level": new_level})
-        .eq("id", commitment_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-
-    _create_activity_trace(
-        user_id,
-        "focus_block_skipped",
-        f"Skipped focus block. Penalty applied. New risk: {new_level}.",
-        {"focus_block_id": block_id, "commitment_id": commitment_id, **request.model_dump()},
-    )
-
-    return {
-        "focus_block": updated_block_res.data[0] if updated_block_res.data else {**block, "status": "skipped"},
-        "commitment": updated_comm.data[0],
-        "risk": {"risk_score": new_score, "risk_level": new_level},
-        "time_spine": get_time_spine_view(commitment_id, user_id),
-    }
+    commitment = repositories.commitments.get_for_user(user_id, commitment_id) if commitment_id else None
+    repositories.focus.update(user_id, block_id, {"status": "skipped", "paused_at": None, "stopped_reason": request.reason})
+    if commitment:
+        risk_score, risk_level = observed_risk(commitment, progress_percent=int(commitment.get("progress_percent") or 0), skipped=True)
+        repositories.commitments.update(user_id, commitment_id, {"risk_score": risk_score, "risk_level": risk_level})
+    return FocusSessionResponse(session=None, reflection_requested=True)

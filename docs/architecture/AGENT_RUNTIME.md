@@ -1,11 +1,11 @@
 # Agent Runtime
 
-ChronOS uses one bounded orchestration runtime.
+ChronOS uses one bounded orchestration runtime for model and tool workflows. Known-path planning remains deterministic.
 
-Known-path workflows run deterministic steps. Agent steps may choose among typed tools or revise a proposal, but deterministic services retain ownership of time arithmetic, overlap checks, authorization, idempotency, and permissions.
+`WorkflowRunner` enforces maximum steps, a combined model/tool request budget, and per-step timeout. It preserves request, workflow, run, and idempotency identifiers. Success, timeout, step limit, request budget, schema validation, denied approval, tool failure, and unexpected failure receive concise classified trace events.
 
-`WorkflowRunner` enforces step and timeout limits and records observable trace events. `ToolSpec` defines typed input/result models, permission class, read/write status, timeout, idempotency, and audit category. `RecommendationFirstApprovalPolicy` allows reads, gates internal writes, and always requires approval for external writes.
+`ToolRegistry` rejects unknown names. `ToolSpec` validates arguments and returned values with Pydantic schemas and declares permission, timeout, idempotency, and audit category. Model tool selection is passed through registry validation and `RecommendationFirstApprovalPolicy` before execution. Reads need no approval, internal writes require explicit approval unless an idempotent internal automation was deliberately enabled, and external writes always require explicit approval.
 
-Traces store workflow and step names, reason category, selected tool, validation result, duration, provider/model metadata, outcome, error classification, and concise decision summaries. They do not store hidden reasoning.
+`WorkflowTraceRepository` creates, completes, and fails runs and appends concise events. Events contain operational facts and safe summaries, not raw prompts, provider payloads, secrets, or hidden reasoning.
 
-The intake flow is the first provider/repository-injected representative workflow. Scheduling and contextual recovery currently remain known-path deterministic flows.
+Intake is the representative end-to-end workflow: the injected repository creates the run, structured extraction consumes one request unit, the runtime persists its trace, and only user-approved drafts are persisted.

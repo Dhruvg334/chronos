@@ -36,6 +36,9 @@ class ToolSpec(Generic[InputT, ResultT]):
     def validate_input(self, raw: dict[str, Any]) -> InputT:
         return self.input_type.model_validate(raw)
 
+    def validate_result(self, raw: Any) -> ResultT:
+        return self.result_type.model_validate(raw)
+
 
 class ToolRegistry:
     def __init__(self) -> None:

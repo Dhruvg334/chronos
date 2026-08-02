@@ -1,28 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.database import supabase_client
-from app.api.dependencies import get_current_user
+from fastapi import APIRouter, Depends
+
+from app.api.dependencies import get_current_user, get_repositories
+from app.repositories.protocols import RepositorySet
 
 router = APIRouter()
 
-@router.get("/runs/{agent_run_id}/trace")
-async def get_agent_traces(agent_run_id: str, user_id: str = Depends(get_current_user)):
-    if not supabase_client:
-        raise HTTPException(status_code=500, detail="Database not initialized")
 
-    res = (
-        supabase_client.table("agent_trace_events")
-        .select("*")
-        .eq("agent_run_id", agent_run_id)
-        .eq("user_id", user_id)
-        .order("created_at", desc=False)
-        .execute()
-    )
-    return {"events": res.data or []}
+@router.get("/runs/{agent_run_id}/trace")
+async def get_agent_traces(agent_run_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    return {"events": repositories.traces.list_events(user_id, agent_run_id)}
+
 
 @router.post("/proposed/{action_id}/approve")
-async def approve_proposed_action(action_id: str, user_id: str = Depends(get_current_user)):
-    return {"message": f"Mock approved action {action_id}", "user_id": user_id}
+async def approve_proposed_action(action_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    proposal = repositories.planning.get_proposal(user_id, action_id)
+    if proposal:
+        repositories.planning.update_proposal(user_id, action_id, {"status": "approved"})
+    return {"status": "approved", "action_id": action_id}
+
 
 @router.post("/proposed/{action_id}/reject")
-async def reject_proposed_action(action_id: str, user_id: str = Depends(get_current_user)):
-    return {"message": f"Mock rejected action {action_id}", "user_id": user_id}
+async def reject_proposed_action(action_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    proposal = repositories.planning.get_proposal(user_id, action_id)
+    if proposal:
+        repositories.planning.update_proposal(user_id, action_id, {"status": "rejected"})
+    return {"status": "rejected", "action_id": action_id}

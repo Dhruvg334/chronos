@@ -75,18 +75,18 @@ export default function Signup() {
 
   if (isSuccess) {
     return (
-      <div className="flex h-screen items-center justify-center bg-warm-ivory p-4">
-        <div className="w-full max-w-md bg-white border border-warm-border rounded-2xl shadow-sm p-8 text-center">
-          <div className="w-16 h-16 bg-warm-cream border border-warm-border rounded-full flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-8 h-8 text-accent-amber" />
+      <div className="flex h-screen items-center justify-center bg-canvas p-4">
+        <div className="w-full max-w-md bg-surface border border-line rounded-2xl shadow-sm p-8 text-center">
+          <div className="w-16 h-16 bg-accent-soft border border-line rounded-full flex items-center justify-center mx-auto mb-6">
+            <Mail className="w-8 h-8 text-accent-strong" />
           </div>
-          <h2 className="text-2xl font-bold text-text-primary mb-3">Check your email</h2>
-          <p className="text-text-secondary mb-6">
+          <h2 className="text-2xl font-bold text-ink mb-3">Check your email</h2>
+          <p className="text-muted mb-6">
             We've sent a verification link to <strong>{email}</strong>. Please verify your account before logging in.
           </p>
           <button
             onClick={() => navigate('/login')}
-            className="w-full bg-white border border-warm-border text-text-primary py-2.5 rounded-lg font-semibold hover:bg-warm-ivory transition-colors"
+            className="w-full bg-surface border border-line text-ink py-2.5 rounded-lg font-semibold hover:bg-canvas transition-colors"
           >
             Return to Login
           </button>
@@ -96,15 +96,15 @@ export default function Signup() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-warm-ivory p-4">
-      <div className="w-full max-w-md bg-white border border-warm-border rounded-2xl shadow-sm p-8">
+    <div className="flex h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md bg-surface border border-line rounded-2xl shadow-sm p-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-extrabold text-text-primary mb-2">Create an account</h1>
-          <p className="text-text-secondary">Build a realistic plan around your commitments and available time.</p>
+          <h1 className="text-2xl font-extrabold text-ink mb-2">Create an account</h1>
+          <p className="text-muted">Build a realistic plan around your commitments and available time.</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-50 border border-risk-atrisk text-risk-atrisk text-sm rounded-lg flex items-start gap-2">
+          <div className="mb-6 p-3 bg-danger-soft border border-danger text-danger text-sm rounded-lg flex items-start gap-2">
             <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
@@ -112,32 +112,32 @@ export default function Signup() {
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-text-secondary mb-1">Email</label>
+            <label className="block text-sm font-semibold text-muted mb-1">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-warm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-amber text-text-primary"
+              className="w-full px-4 py-2 bg-surface border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-ink"
               placeholder="you@example.com"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-text-secondary mb-1">Password</label>
+            <label className="block text-sm font-semibold text-muted mb-1">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-warm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-amber text-text-primary"
+              className="w-full px-4 py-2 bg-surface border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-ink"
               placeholder="At least 8 characters"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-text-secondary mb-1">Confirm Password</label>
+            <label className="block text-sm font-semibold text-muted mb-1">Confirm Password</label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-warm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-amber text-text-primary"
+              className="w-full px-4 py-2 bg-surface border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-ink"
               placeholder="Repeat your password"
             />
           </div>
@@ -145,16 +145,16 @@ export default function Signup() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-accent-amber text-white py-2.5 rounded-lg font-semibold hover:bg-accent-terracotta transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-accent text-white py-2.5 rounded-lg font-semibold hover:bg-accent-strong transition-colors disabled:opacity-50"
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             Sign Up
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-text-secondary">
+        <div className="mt-6 text-center text-sm text-muted">
           Already have an account?{' '}
-          <Link to="/login" className="text-accent-amber font-semibold hover:underline">
+          <Link to="/login" className="text-accent-strong font-semibold hover:underline">
             Log in
           </Link>
         </div>

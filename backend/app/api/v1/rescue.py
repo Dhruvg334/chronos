@@ -1,129 +1,69 @@
-from typing import Any, Dict
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+import uuid
+from datetime import datetime
+from typing import Any
 
-from app.api.dependencies import get_current_user
-from app.core.database import supabase_client
-from app.services.google_calendar_service import get_free_busy
-from app.services.google_oauth_service import get_connection_status
-from app.services.rescue_graph import run_rescue_graph
-from app.services.rescue_service import find_rescue_candidates
-from app.services.scheduling_service import detect_overlaps, parse_iso
+from fastapi import APIRouter, Depends
+
+from app.api.dependencies import get_current_user, get_repositories
+from app.core.errors import ChronosError, ErrorCode
+from app.repositories.protocols import RepositorySet
+from app.services.core_journey import CoreJourneyService, rank_commitments
 
 router = APIRouter()
 
-_ALLOWED_RESCUE_TYPES = {
-    "create_rescue_focus_block",
-    "defer_task",
-    "compress_scope",
-    "save_renegotiation_draft",
-    "increase_focus_intensity",
-    "renegotiate_deadline",
-}
-
 
 @router.get("/candidates")
-def get_rescue_candidates(user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
-    res = (
-        supabase_client.table("commitments")
-        .select("*, focus_blocks(*), tasks(*)")
-        .eq("user_id", user_id)
-        .execute()
-    )
-    commitments = res.data or []
-    candidates = find_rescue_candidates(commitments, user_id)
-    return {"candidates": candidates}
+def get_rescue_candidates(user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
+    rows = rank_commitments(repositories.commitments.list_for_user(user_id))
+    return {"candidates": [{**row, "_rescue_reason": "The current risk and remaining work need a more credible plan."} for row in rows if row.get("risk_level") in {"at_risk", "critical", "rescue_required"}]}
 
 
 @router.post("/{commitment_id}/plan")
-def generate_rescue_plan(commitment_id: str, user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
-    try:
-        proposals = run_rescue_graph(user_id, commitment_id)
-        return {"status": "plan_generated", "proposals": proposals}
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+def generate_rescue_plan(commitment_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
+    commitment = repositories.commitments.get_for_user(user_id, commitment_id)
+    if not commitment:
+        raise ChronosError(ErrorCode.VALIDATION, "Commitment not found.")
+    workflow_id = str(uuid.uuid4())
+    run_id = repositories.traces.create_run(user_id, "recovery", {"commitment_id": commitment_id}, workflow_id=workflow_id)
+    payload = {"rescue_action_type": "compress_scope", "commitment_id": commitment_id, "title": f"Reduce the next scope for {commitment['title']}", "suggestion": "Define the smallest acceptable next outcome before moving lower-priority work."}
+    proposal = repositories.planning.create_proposal(user_id, {"id": str(uuid.uuid4()), "agent_run_id": run_id, "action_type": "commitment_rescue", "status": "pending", "payload_json": payload, "explanation": "This is a recommendation. No plan data changes until you approve it."})
+    repositories.traces.append(user_id, run_id, {"step_name": "recovery_proposed", "status": "succeeded", "explanation": "Prepared a recovery recommendation.", "payload_json": {"commitment_id": commitment_id}})
+    repositories.traces.complete_run(user_id, run_id, {"proposal_count": 1})
+    return {"status": "plan_generated", "proposals": [proposal]}
 
 
 @router.get("/plans")
-def get_rescue_plans(user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
-    res = (
-        supabase_client.table("agent_proposed_actions")
-        .select("*")
-        .eq("user_id", user_id)
-        .eq("status", "pending")
-        .eq("action_type", "commitment_rescue")
-        .execute()
-    )
-    return {"proposals": res.data or []}
+def get_rescue_plans(user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
+    return {"proposals": [row for row in repositories.planning.list_pending(user_id) if row.get("action_type") == "commitment_rescue"]}
 
 
-def _get_pending_rescue_proposal(proposal_id: str, user_id: str) -> dict:
-    res = (
-        supabase_client.table("agent_proposed_actions")
-        .select("*")
-        .eq("id", proposal_id)
-        .eq("user_id", user_id)
-        .eq("action_type", "commitment_rescue")
-        .execute()
-    )
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Proposal not found")
-    proposal = res.data[0]
-    if proposal["status"] != "pending":
-        raise HTTPException(status_code=400, detail="Proposal is no longer pending")
-    payload = proposal.get("payload_json") or {}
-    rescue_action_type = payload.get("rescue_action_type")
-    if rescue_action_type not in _ALLOWED_RESCUE_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid rescue action type")
+def _pending(repositories: RepositorySet, user_id: str, proposal_id: str) -> dict[str, Any]:
+    proposal = repositories.planning.get_proposal(user_id, proposal_id)
+    if not proposal or proposal.get("action_type") != "commitment_rescue":
+        raise ChronosError(ErrorCode.VALIDATION, "Recovery proposal not found.")
+    if proposal.get("status") != "pending":
+        raise ChronosError(ErrorCode.CONFLICT, "This recovery proposal is no longer pending.")
     return proposal
 
 
-@router.post("/proposals/{id}/approve")
-def approve_rescue_proposal(id: str, user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
-    proposal = _get_pending_rescue_proposal(id, user_id)
-    payload = proposal["payload_json"]
-    rescue_action_type = payload["rescue_action_type"]
-
-    created_focus_block = None
-    if rescue_action_type == "create_rescue_focus_block":
-        start_at = parse_iso(payload["start_at"])
-        end_at = parse_iso(payload["end_at"])
-
-        fb_res = (
-            supabase_client.table("focus_blocks")
-            .select("*")
-            .eq("user_id", user_id)
-            .in_("status", ["scheduled", "active"])
-            .execute()
-        )
-        existing_blocks = fb_res.data or []
-
-        busy_windows = []
-        status = get_connection_status(user_id)
-        if status.get("connected"):
-            busy_windows = get_free_busy(user_id, start_at, end_at) or []
-
-        if detect_overlaps(start_at, end_at, existing_blocks, busy_windows):
-            raise HTTPException(status_code=409, detail="Proposed rescue time overlaps with existing blocks or calendar events")
-
-        insert_res = supabase_client.table("focus_blocks").insert({
-            "commitment_id": payload["commitment_id"],
-            "user_id": user_id,
-            "title": payload["title"],
-            "start_at": payload["start_at"],
-            "end_at": payload["end_at"],
-            "status": "scheduled",
-            "block_type": "deep_work",
-        }).execute()
-        created_focus_block = insert_res.data[0] if insert_res.data else None
-
-    # For defer/compress/draft actions, approval records the decision only. No destructive task mutation yet.
-    supabase_client.table("agent_proposed_actions").update({"status": "approved"}).eq("id", id).eq("user_id", user_id).eq("action_type", "commitment_rescue").execute()
-    return {"status": "approved", "action": rescue_action_type, "focus_block": created_focus_block}
+@router.post("/proposals/{proposal_id}/approve")
+def approve_rescue_proposal(proposal_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
+    proposal = _pending(repositories, user_id, proposal_id)
+    payload = proposal.get("payload_json") or {}
+    created = None
+    if payload.get("rescue_action_type") == "create_rescue_focus_block":
+        start = datetime.fromisoformat(str(payload["start_at"]).replace("Z", "+00:00"))
+        end = datetime.fromisoformat(str(payload["end_at"]).replace("Z", "+00:00"))
+        duration = max(10, int((end - start).total_seconds() // 60))
+        created = CoreJourneyService(repositories).create_plan_block(user_id, payload["commitment_id"], start, duration, payload.get("title"), "deep_work")
+    repositories.planning.update_proposal(user_id, proposal_id, {"status": "approved"})
+    return {"status": "approved", "action": payload.get("rescue_action_type"), "focus_block": created}
 
 
-@router.post("/proposals/{id}/reject")
-def reject_rescue_proposal(id: str, user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
-    _get_pending_rescue_proposal(id, user_id)
-    supabase_client.table("agent_proposed_actions").update({"status": "rejected"}).eq("id", id).eq("user_id", user_id).eq("action_type", "commitment_rescue").execute()
+@router.post("/proposals/{proposal_id}/reject")
+def reject_rescue_proposal(proposal_id: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
+    _pending(repositories, user_id, proposal_id)
+    repositories.planning.update_proposal(user_id, proposal_id, {"status": "rejected"})
     return {"status": "rejected"}

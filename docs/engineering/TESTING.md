@@ -1,16 +1,17 @@
 # Testing
 
-Default tests are offline. They must not open sockets, local ports, Docker, Supabase, Google, or Groq. Clear external configuration before application imports and override dependencies with fakes.
+Default tests are offline. They must not open sockets, local ports, Docker, Supabase, Google, or Groq. Repository, auth, model, and browser-network boundaries use deterministic fakes.
 
 Backend:
 
 ```powershell
 cd backend
+.\venv\Scripts\activate
 python -m pytest
 python -m pytest -m integration
 ```
 
-The integration suite is opt-in and reports missing configuration as a skip.
+Runtime tests cover step and request budgets, timeouts, unknown tools, argument/result validation, read execution, internal/external write approval, model selection, idempotency metadata, and trace persistence on success and failure. Core journey tests cover consolidated Today, Strategy Engine cases, Plan composition/conflicts, Focus lifecycle, intake approval, recovery, and reflection.
 
 Frontend:
 
@@ -23,6 +24,6 @@ npm run test -- --run
 npm run build
 ```
 
-Frontend tests use Vitest, React Testing Library, jsdom, and mocked browser/network boundaries. They do not require the backend.
+Frontend tests cover consolidated Today, focus start/pause/resume/finish, stuck options, contextual reflection and recovery, plan-block success/conflict, strategy evidence, logout cache clearing, protected routes, and lazy route fallback.
 
-Manual profiles: open `/demo` logged out; open `/today` logged out; test invalid email `dhruv`, weak password `password`, mismatched `Chronos123!`/`Chronos456!`; use the documented multi-commitment Inbox sample; verify logout clears the session and protected views.
+Manual core profile: capture the documented multi-commitment sample, approve reviewed drafts, create a 60-minute authentication-fix block tomorrow at 10:00, repeat it to verify the overlap error, then run a 25-minute focus session through pause, resume, stuck, and partial reflection.

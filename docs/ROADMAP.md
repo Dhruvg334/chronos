@@ -1,20 +1,13 @@
 # Roadmap
 
-## Next foundation work
+## Next core hardening
 
-- Complete migration of direct Supabase query paths to repository injection.
-- Persist strategy preferences and recommendations with forward migrations only when product behavior is implemented.
-- Add day/week plan interactions, overlap validation, buffers, and contextual focus completion.
-- Add trace persistence through the repository boundary and evaluation fixtures.
+- Migrate historical commitment detail, legacy scheduling/command, standalone time-spine/trace, and calendar-sync paths when those surfaces re-enter the core journey.
+- Add persisted working-hour and buffer preferences so capacity can replace the current conservative eight-hour daily envelope.
+- Add transactional database functions for multi-row intake approval and focus completion.
+- Add opt-in Supabase integration coverage for migration 019, RLS ownership, overlap behavior, and workflow trace persistence.
+- Split shared vendor dependencies further if the entry bundle grows materially.
 
-## Later product work
+## Deliberately deferred
 
-- Projects and outcomes after their domain model is implemented.
-- Insights after sufficient execution evidence exists.
-- Outlook Calendar, Gmail, Notion, GitHub, Obsidian, and Microsoft Planner adapters.
-- Knowledge retrieval after measured requirements justify indexing and chunk storage.
-- Explicitly approved calendar write-back and communication drafts.
-- Desktop packaging and native mobile clients.
-- Hosted-service quotas and operating-cost controls.
-
-MCP, billing, email sending, full retrieval infrastructure, and a complete database-domain migration remain out of scope until their security and product use cases are defined.
+Projects, Insights, billing, desktop packaging, retrieval infrastructure, MCP, new integrations, advanced drag-and-drop planning, and autonomous external actions are outside the current core foundation.

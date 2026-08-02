@@ -10,8 +10,8 @@ class IntakeWorkflow:
         self.gateway = gateway
         self.runner = runner
 
-    async def extract(self, *, user_id: str, text: str) -> tuple[IntakeResponse, list]:
-        context = self.runner.context(user_id, "intake")
+    async def extract(self, *, user_id: str, text: str, request_id: str | None = None) -> tuple[IntakeResponse, object]:
+        context = self.runner.context(user_id, "intake", input_summary={"text_length": len(text)}, request_id=request_id)
         request = ModelRequest(
             prompt=(
                 "Extract distinct commitments, child tasks, and only necessary clarifying questions from this text. "
@@ -23,12 +23,18 @@ class IntakeWorkflow:
             model_role="fast",
             temperature=0,
         )
-        response = await self.runner.run_step(
-            context,
-            "extract_commitments",
-            "structured_extraction",
-            lambda: self.gateway.generate_structured(request, IntakeResponse),
-            provider=self.gateway.metadata().get("provider"),
-            model=self.gateway.metadata().get("fast_model") or self.gateway.metadata().get("model"),
-        )
-        return response.value, context.traces
+        try:
+            response = await self.runner.run_step(
+                context,
+                "extract_commitments",
+                "structured_extraction",
+                lambda: self.gateway.generate_structured(request, IntakeResponse),
+                provider=self.gateway.metadata().get("provider"),
+                model=self.gateway.metadata().get("fast_model") or self.gateway.metadata().get("model"),
+                request_units=1,
+            )
+            self.runner.complete(context, {"draft_count": len(response.value.drafts), "question_count": len(response.value.questions)})
+            return response.value, context
+        except Exception as exc:
+            self.runner.fail(context, exc)
+            raise

@@ -21,4 +21,6 @@ npm ci
 npm run dev
 ```
 
-Before a handoff, run every command in `TESTING.md`. Do not use unsafe dependency flags. Add external clients only through the application container and dependencies. Add database changes as forward migrations.
+Before handoff, run every command in `TESTING.md`. Default tests must stay offline. Add application persistence through repository protocols, external clients through the lazy container, and schema changes through forward migrations only. Do not edit applied migrations.
+
+Core API entry points are `GET /api/v1/today`, `POST /api/v1/today/strategy`, `GET /api/v1/plan`, `POST /api/v1/plan/blocks`, and `/api/v1/focus-blocks` lifecycle routes.

@@ -1,5 +1,6 @@
 import { CalendarRange, Inbox, LogOut, Settings, SunMedium } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/auth-context';
 
 const primaryItems = [
@@ -11,6 +12,7 @@ const primaryItems = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { session, signOut } = useAuth();
+  const queryClient = useQueryClient();
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
@@ -27,7 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <Link to="/guide" className="hidden text-sm font-medium text-muted hover:text-ink sm:block">Guide</Link>
             <Link to="/settings" aria-label="Settings" className="icon-button"><Settings className="h-4 w-4" /></Link>
-            <button className="icon-button" aria-label="Log out" onClick={async () => { await signOut(); navigate('/'); }}><LogOut className="h-4 w-4" /></button>
+            <button className="icon-button" aria-label="Log out" onClick={async () => { await signOut(); queryClient.clear(); navigate('/'); }}><LogOut className="h-4 w-4" /></button>
           </div>
         </div>
       </header>
