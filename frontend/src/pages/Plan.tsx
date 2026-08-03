@@ -10,6 +10,8 @@ import {
 } from "../components/ui/primitives";
 import { apiFetch, apiUrl, getApiErrorMessage } from "../lib/api";
 import { WhyThisPlan } from "../components/planning/WhyThisPlan";
+import { RoutinesPanel } from "../components/planning/RoutinesPanel";
+import { Link } from "react-router-dom";
 import type { AdaptivePlanResponse, PlanItem, PlanResponse } from "../types/api";
 
 function localDateValue(date: Date) {
@@ -153,7 +155,7 @@ export default function Plan() {
         title="Make the work fit the time"
         description="Calendar events, focus blocks, unscheduled commitments, capacity, and buffers in one view."
         action={
-          <div className="flex flex-wrap gap-2"><button
+          <div className="flex flex-wrap gap-2"><Link className="button-secondary" to="/week">Plan the week</Link><Link className="button-secondary" to="/projects">Projects</Link><button
             className="button-secondary"
             disabled={adaptive.isPending || !query.data?.unscheduled_commitments.length}
             onClick={() => adaptive.mutate()}
@@ -415,6 +417,7 @@ export default function Plan() {
           </div>
         )
       )}
+      <div className="mt-5"><RoutinesPanel /></div>
     </AppShell>
   );
 }

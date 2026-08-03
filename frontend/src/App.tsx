@@ -9,6 +9,8 @@ const Inbox = lazy(() => import('./pages/Inbox'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
 const Plan = lazy(() => import('./pages/Plan'));
+const Projects = lazy(() => import('./pages/Projects'));
+const Week = lazy(() => import('./pages/Week'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Signup = lazy(() => import('./pages/Signup'));
 const Today = lazy(() => import('./pages/Today'));
@@ -29,6 +31,9 @@ export function AppRoutes() {
       <Route path="/today" element={<Today />} />
       <Route path="/inbox" element={<Inbox />} />
       <Route path="/plan" element={<Plan />} />
+      <Route path="/week" element={<Week />} />
+      <Route path="/projects" element={<Projects />} />
+      <Route path="/projects/:projectId" element={<Projects />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/command" element={<Navigate to="/today" replace />} />
       <Route path="/calendar" element={<Navigate to="/plan" replace />} />

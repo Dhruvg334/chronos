@@ -2,7 +2,7 @@
 
 ChronOS is a personal execution system for knowledge workers and advanced students managing competing outcomes, meetings, projects, coursework, and personal commitments.
 
-The promise is simple: ChronOS turns scattered commitments into a realistic day and quietly repairs the plan when reality changes.
+The promise is simple: ChronOS turns scattered commitments and meaningful outcomes into a realistic day or week, then quietly repairs the plan when reality changes.
 
 ## Product boundaries
 
@@ -12,6 +12,6 @@ Automation is recommendation-first. Internal reading and suggestion generation m
 
 ## Delivery direction
 
-The responsive web application supports capture, Today, and planning now. Desktop and native mobile clients are later work. Supabase remains the cloud-first data and authentication platform, with portability and self-hosting kept as architectural requirements.
+The responsive web application supports capture, Today, daily and weekly planning, projects, outcomes, routines, and focused execution. Projects organize meaningful completed states rather than acting as generic folders; routines represent recurring behaviour without punitive streak mechanics. Desktop and native mobile clients are later work. Supabase remains the cloud-first data and authentication platform, with portability and self-hosting kept as architectural requirements.
 
 The core remains open source. Hosted-service quotas and operating-cost controls may be added later without placing core planning logic behind proprietary infrastructure.

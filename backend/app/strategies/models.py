@@ -36,6 +36,7 @@ class StrategyPreferences(BaseModel):
 
 
 class StrategyContext(BaseModel):
+    weekly_planning: bool = False
     task_title: str | None = None
     estimate_minutes: int | None = None
     similar_quick_tasks: int = 0

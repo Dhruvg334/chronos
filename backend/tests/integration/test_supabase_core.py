@@ -204,3 +204,32 @@ def test_rls_prevents_cross_user_reads_writes_and_approval(live):
     response = TestClient(app).get("/api/v1/today")
     assert response.status_code == 200
     assert response.json()["next_action"] is None
+
+
+def test_projects_routines_weekly_plan_rls_and_atomic_approval(live):
+    admin, alpha, beta, alpha_id, beta_id = live
+    repositories = create_repository_set(admin)
+    project = repositories.projects.create(alpha_id, {"id": str(uuid.uuid4()), "title": "ChronOS Production Release", "description": "Ship safely", "status": "active", "target_date": (datetime.now(timezone.utc).date() + timedelta(days=21)).isoformat(), "colour": "accent"})
+    outcome = repositories.outcomes.create(alpha_id, {"id": str(uuid.uuid4()), "project_id": project["id"], "title": "Stable authentication", "description": "", "status": "active", "target_date": (datetime.now(timezone.utc).date() + timedelta(days=14)).isoformat(), "importance": 5, "estimated_effort_minutes": 90, "confidence": .9, "completion_criteria": "Regression suite passes", "provenance": "inbox"})
+    routine = repositories.routines.create(alpha_id, {"id": str(uuid.uuid4()), "title": "Daily release review", "frequency_rule": "weekly", "preferred_days": [0,1,2,3,4,5], "preferred_time": "18:00", "minimum_viable_version": "5-minute blocker review", "estimated_duration_minutes": 20, "active": True})
+    commitment = repositories.commitments.create(alpha_id, _commitment(alpha_id, "Weekly atomic work") | {"project_id": project["id"], "outcome_id": outcome["id"]})
+    start = (datetime.now(timezone.utc) + timedelta(days=4)).replace(hour=8, minute=0, second=0, microsecond=0)
+    plan = repositories.weekly_plans.create(alpha_id, {"id": str(uuid.uuid4()), "week_start": start.date().isoformat(), "status": "pending", "proposal_json": {"blocks": [{"commitment_id": commitment["id"], "title": commitment["title"], "start_at": start.isoformat(), "duration_minutes": 30}]}, "explanation_json": {"requires_approval": True}})
+
+    for table, record_id in (("projects", project["id"]), ("outcomes", outcome["id"]), ("routines", routine["id"]), ("weekly_plans", plan["id"])):
+        assert beta.table(table).select("*").eq("id", record_id).execute().data == []
+        assert beta.table(table).update({"status": "archived"} if table in {"projects", "outcomes"} else {"user_id": beta_id}).eq("id", record_id).execute().data == []
+        assert beta.table(table).delete().eq("id", record_id).execute().data == []
+        assert admin.table(table).select("id").eq("id", record_id).execute().data
+
+    key = f"weekly-{uuid.uuid4()}"; block_id = str(uuid.uuid4())
+    approved = alpha.rpc("approve_weekly_plan_transaction", {"p_user_id": alpha_id, "p_plan_id": plan["id"], "p_idempotency_key": key, "p_block_ids": [block_id]}).execute().data
+    assert approved["status"] == "approved"
+    assert alpha.rpc("approve_weekly_plan_transaction", {"p_user_id": alpha_id, "p_plan_id": plan["id"], "p_idempotency_key": key, "p_block_ids": [block_id]}).execute().data["idempotent_replay"] is True
+
+    rollback = repositories.weekly_plans.create(alpha_id, {"id": str(uuid.uuid4()), "week_start": start.date().isoformat(), "status": "pending", "proposal_json": {"blocks": [{"commitment_id": commitment["id"], "title": "First", "start_at": (start + timedelta(hours=2)).isoformat(), "duration_minutes": 30}, {"commitment_id": commitment["id"], "title": "Overlap", "start_at": (start + timedelta(hours=2, minutes=10)).isoformat(), "duration_minutes": 30}]}, "explanation_json": {}})
+    rollback_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+    failed = alpha.rpc("approve_weekly_plan_transaction", {"p_user_id": alpha_id, "p_plan_id": rollback["id"], "p_idempotency_key": f"weekly-{uuid.uuid4()}", "p_block_ids": rollback_ids}).execute().data
+    assert failed["status"] == "failed" and admin.table("focus_blocks").select("id").in_("id", rollback_ids).execute().data == []
+    assert repositories.weekly_plans.get_for_user(alpha_id, rollback["id"])["status"] == "pending"
+    with pytest.raises(Exception): beta.rpc("approve_weekly_plan_transaction", {"p_user_id": beta_id, "p_plan_id": rollback["id"], "p_idempotency_key": f"weekly-{uuid.uuid4()}", "p_block_ids": rollback_ids}).execute()

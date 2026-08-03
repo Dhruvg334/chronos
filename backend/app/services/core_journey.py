@@ -211,11 +211,15 @@ class CoreJourneyService:
         next_action = None
         if ranked:
             next_row = ranked[0]
+            project = self.repositories.projects.get_for_user(user_id, str(next_row["project_id"])) if next_row.get("project_id") else None
+            outcome = self.repositories.outcomes.get_for_user(user_id, str(next_row["outcome_id"])) if next_row.get("outcome_id") else None
             next_action = NextActionView(
                 commitment_id=str(next_row["id"]),
                 title=str(next_row["title"]),
                 detail=str(next_row.get("description") or "Define the smallest visible step that moves this forward."),
                 estimated_minutes=max(0, int(next_row.get("estimated_minutes") or 0) - int(next_row.get("actual_minutes") or 0)),
+                project={"id": str(project["id"]), "title": project["title"]} if project else None,
+                outcome={"id": str(outcome["id"]), "title": outcome["title"]} if outcome else None,
             )
         ordered = [
             PlanItemView(id=str(row["id"]), kind="commitment", title=str(row["title"]), commitment_id=str(row["id"]), status=str(row.get("risk_level") or row.get("status") or "active"))
@@ -232,6 +236,13 @@ class CoreJourneyService:
                 options=("Define a smaller next step", "Protect a short focus block", "Defer lower-priority work"),
             )
         status = "empty" if not ranked else "attention" if attention else "clear"
+        persisted_occurrences = {(str(item["routine_id"]), str(item["occurrence_date"])): item for item in self.repositories.routines.list_occurrences(user_id, day_start, day_end)}
+        routines_due = []
+        for routine in self.repositories.routines.list_for_user(user_id):
+            if routine.get("active") and local_current.weekday() in routine.get("preferred_days", []):
+                occurrence = persisted_occurrences.get((str(routine["id"]), local_current.date().isoformat()))
+                if not occurrence or occurrence.get("status") == "due":
+                    routines_due.append({"id": str(routine["id"]), "title": routine["title"], "preferred_time": str(routine.get("preferred_time") or "")[:5] or None, "duration_minutes": routine["estimated_duration_minutes"], "minimum_viable_version": routine["minimum_viable_version"]})
         return TodayResponse(
             status=status,
             status_message="Nothing needs scheduling yet." if status == "empty" else "One decision can make the plan workable." if status == "attention" else "The plan is workable.",
@@ -250,6 +261,7 @@ class CoreJourneyService:
                 "ai_used": False,
                 "requires_approval": True,
             },
+            routines_due=routines_due[:6],
         )
 
     def plan(self, user_id: str, start_at: datetime, end_at: datetime) -> PlanResponse:

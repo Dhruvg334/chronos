@@ -9,6 +9,7 @@
 - Adaptive intake preserves uncertainty and dependency evidence; adaptive planning and recovery use bounded model calls followed by deterministic validation.
 - Read-only Google events contribute to capacity with live/cached/stale/unavailable provenance, confidence, last sync, and retry behavior.
 - Atomic adaptive-plan approval is available through migration 022, and compact user-facing explanations preserve the approval boundary.
+- Projects organize meaningful outcomes, routines preserve flexible continuity, and deterministic Weekly Planning produces editable approval-first focus sets through migration 024.
 
 ## Next core hardening
 
@@ -19,4 +20,4 @@
 
 ## Deliberately deferred
 
-Projects, Insights, billing, desktop packaging, retrieval infrastructure, MCP, new integrations, advanced drag-and-drop planning, and autonomous external actions are outside the current core foundation.
+Insights, billing, desktop packaging, retrieval infrastructure, MCP, new integrations, advanced drag-and-drop planning, collaboration boards, notifications, and autonomous external actions are outside the current core foundation.

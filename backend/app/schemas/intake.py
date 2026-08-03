@@ -33,6 +33,8 @@ class ExtractedCommitment(BaseModel):
     deadline_precision: Literal["exact", "window", "ambiguous", "none"] = "none"
     effort_confidence: Literal["known", "approximate", "unknown"] = "unknown"
     dependencies: List[str] = Field(default_factory=list, max_length=5)
+    project_id: Optional[UUID] = None
+    outcome_id: Optional[UUID] = None
 
 class IntakeResponse(BaseModel):
     agent_run_id: Optional[UUID] = None

@@ -1,4 +1,4 @@
-import { CalendarRange, Inbox, LogOut, Settings, SunMedium } from 'lucide-react';
+import { CalendarRange, FolderKanban, Inbox, LogOut, Settings, SunMedium } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/auth-context';
@@ -7,6 +7,7 @@ const primaryItems = [
   { label: 'Today', path: '/today', icon: SunMedium },
   { label: 'Inbox', path: '/inbox', icon: Inbox },
   { label: 'Plan', path: '/plan', icon: CalendarRange },
+  { label: 'Projects', path: '/projects', icon: FolderKanban },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

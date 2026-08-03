@@ -24,7 +24,7 @@ class _BaseRepository:
 class SupabaseCommitmentsRepository(_BaseRepository):
     def approve_intake(self, user_id: str, run_id: str, idempotency_key: str, items: list[dict[str, Any]]) -> dict[str, Any]:
         try:
-            result = self.client.rpc("approve_intake_transaction", {"p_user_id": user_id, "p_run_id": run_id, "p_idempotency_key": idempotency_key, "p_items": items}).execute().data
+            result = self.client.rpc("approve_planning_intake_transaction", {"p_user_id": user_id, "p_run_id": run_id, "p_idempotency_key": idempotency_key, "p_items": items}).execute().data
             if result.get("status") == "failed": raise RuntimeError(result.get("error_code"))
             return result
         except Exception as exc:
@@ -347,6 +347,101 @@ class SupabasePlanningProfileRepository(_BaseRepository):
         return self.update(user_id, PLANNING_PROFILE_DEFAULTS.copy())
 
 
+class _OwnedCrudRepository(_BaseRepository):
+    table_name: str
+    label: str
+
+    def list_for_user(self, user_id: str) -> list[dict[str, Any]]:
+        try:
+            return self.client.table(self.table_name).select("*").eq("user_id", user_id).order("created_at", desc=True).execute().data or []
+        except Exception as exc:
+            raise self._failure(f"{self.label}.list", exc) from exc
+
+    def get_for_user(self, user_id: str, item_id: str) -> dict[str, Any] | None:
+        try:
+            rows = self.client.table(self.table_name).select("*").eq("user_id", user_id).eq("id", item_id).limit(1).execute().data or []
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise self._failure(f"{self.label}.get", exc) from exc
+
+    def create(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table(self.table_name).insert({**data, "user_id": user_id}).execute().data or []
+            if not rows: raise RuntimeError("insert returned no row")
+            return rows[0]
+        except Exception as exc:
+            raise self._failure(f"{self.label}.create", exc) from exc
+
+    def update(self, user_id: str, item_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table(self.table_name).update(data).eq("user_id", user_id).eq("id", item_id).execute().data or []
+            if not rows: raise ChronosError(ErrorCode.VALIDATION, f"{self.label.title()} not found.")
+            return rows[0]
+        except ChronosError:
+            raise
+        except Exception as exc:
+            raise self._failure(f"{self.label}.update", exc) from exc
+
+
+class SupabaseProjectsRepository(_OwnedCrudRepository):
+    table_name = "projects"
+    label = "project"
+
+
+class SupabaseOutcomesRepository(_OwnedCrudRepository):
+    table_name = "outcomes"
+    label = "outcome"
+
+    def list_for_user(self, user_id: str, project_id: str | None = None) -> list[dict[str, Any]]:
+        try:
+            query = self.client.table(self.table_name).select("*").eq("user_id", user_id)
+            if project_id: query = query.eq("project_id", project_id)
+            return query.order("target_date").execute().data or []
+        except Exception as exc:
+            raise self._failure("outcome.list", exc) from exc
+
+    def link_work(self, user_id: str, outcome_id: str, commitment_ids: list[str], task_ids: list[str]) -> None:
+        try:
+            if commitment_ids:
+                self.client.table("commitments").update({"outcome_id": outcome_id}).eq("user_id", user_id).in_("id", commitment_ids).execute()
+            if task_ids:
+                self.client.table("tasks").update({"outcome_id": outcome_id}).eq("user_id", user_id).in_("id", task_ids).execute()
+        except Exception as exc:
+            raise self._failure("outcome.link_work", exc) from exc
+
+
+class SupabaseRoutinesRepository(_OwnedCrudRepository):
+    table_name = "routines"
+    label = "routine"
+
+    def upsert_occurrence(self, user_id: str, routine_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("routine_occurrences").upsert({**data, "routine_id": routine_id, "user_id": user_id}, on_conflict="routine_id,occurrence_date").execute().data or []
+            if not rows: raise RuntimeError("upsert returned no row")
+            return rows[0]
+        except Exception as exc:
+            raise self._failure("routine.occurrence", exc) from exc
+
+    def list_occurrences(self, user_id: str, start_at: datetime, end_at: datetime) -> list[dict[str, Any]]:
+        try:
+            return self.client.table("routine_occurrences").select("*").eq("user_id", user_id).gte("occurrence_date", start_at.date().isoformat()).lt("occurrence_date", end_at.date().isoformat()).execute().data or []
+        except Exception as exc:
+            raise self._failure("routine.occurrences", exc) from exc
+
+
+class SupabaseWeeklyPlansRepository(_OwnedCrudRepository):
+    table_name = "weekly_plans"
+    label = "weekly plan"
+
+    def approve(self, user_id: str, plan_id: str, idempotency_key: str, block_ids: list[str]) -> dict[str, Any]:
+        try:
+            result = self.client.rpc("approve_weekly_plan_transaction", {"p_user_id": user_id, "p_plan_id": plan_id, "p_idempotency_key": idempotency_key, "p_block_ids": block_ids}).execute().data
+            if result.get("status") == "failed": raise RuntimeError(result.get("error_code"))
+            return result
+        except Exception as exc:
+            raise self._failure("weekly_plan.approve_transaction", exc) from exc
+
+
 def create_repository_set(client: Client) -> RepositorySet:
     return RepositorySet(
         commitments=SupabaseCommitmentsRepository(client),
@@ -356,4 +451,8 @@ def create_repository_set(client: Client) -> RepositorySet:
         traces=SupabaseWorkflowTraceRepository(client),
         google_connections=SupabaseGoogleConnectionRepository(client),
         planning_profiles=SupabasePlanningProfileRepository(client),
+        projects=SupabaseProjectsRepository(client),
+        outcomes=SupabaseOutcomesRepository(client),
+        routines=SupabaseRoutinesRepository(client),
+        weekly_plans=SupabaseWeeklyPlansRepository(client),
     )

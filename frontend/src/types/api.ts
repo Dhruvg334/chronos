@@ -36,6 +36,8 @@ export interface ExtractedCommitment {
   deadline_precision?: 'exact' | 'window' | 'ambiguous' | 'none';
   effort_confidence?: 'known' | 'approximate' | 'unknown';
   dependencies?: string[];
+  project_id?: string | null;
+  outcome_id?: string | null;
 }
 
 export type CommitmentDraft = ExtractedCommitment;
@@ -209,7 +211,7 @@ export interface ActiveFocusSession {
 export interface TodayResponse {
   status: 'clear' | 'attention' | 'empty';
   status_message: string;
-  next_action: { commitment_id: string; task_id?: string | null; title: string; detail: string; estimated_minutes: number } | null;
+  next_action: { commitment_id: string; task_id?: string | null; title: string; detail: string; estimated_minutes: number; project?: { id: string; title: string } | null; outcome?: { id: string; title: string } | null } | null;
   ordered_plan: PlanItem[];
   attention_count: number;
   strategy_recommendation: StrategyRecommendation | null;
@@ -217,7 +219,16 @@ export interface TodayResponse {
   active_focus_session: ActiveFocusSession | null;
   recovery: { commitment_id: string; title: string; reason: string; options: string[]; requires_approval: true } | null;
   explanation?: PlanExplanation | null;
+  routines_due?: Array<{ id: string; title: string; preferred_time?: string | null; duration_minutes: number; minimum_viable_version: string }>;
 }
+
+export interface ProjectSummary { id: string; title: string; description: string; status: 'active' | 'paused' | 'completed' | 'archived'; target_date?: string | null; colour: string; outcome_count: number; completed_outcome_count: number; progress_percent: number; next_action?: string | null }
+export interface Outcome { id: string; project_id?: string | null; title: string; description: string; status: 'active' | 'blocked' | 'uncertain' | 'completed' | 'archived'; target_date?: string | null; importance: number; estimated_effort_minutes?: number | null; confidence: number; completion_criteria: string; provenance?: string | null }
+export interface ProjectDetail extends ProjectSummary { outcomes: Outcome[]; linked_commitments: SavedCommitment[]; available_commitments: SavedCommitment[] }
+export interface Routine { id: string; title: string; frequency_rule: 'daily' | 'weekly'; preferred_days: number[]; preferred_time?: string | null; minimum_viable_version: string; estimated_duration_minutes: number; active: boolean; continuity_recovery?: string | null; occurrences: Array<{ date: string; status: string; preferred_time?: string | null }> }
+export interface WeeklyDayCapacity { date: string; available_minutes: number; scheduled_minutes: number; remaining_minutes: number; buffer_minutes: number; over_capacity_minutes: number; confidence: string; sources: string[] }
+export interface WeeklyView { week_start: string; timezone: string; days: WeeklyDayCapacity[]; due_outcomes: Outcome[]; unscheduled_work: SavedCommitment[]; routine_occurrences: Array<{ routine_id: string; title: string; occurrences: Array<{ date: string; status: string }>; continuity_recovery?: string | null }>; active_projects: ProjectSummary[]; primary_strategy?: StrategyRecommendation | null }
+export interface WeeklyProposal { id: string; status: 'pending' | 'approved' | 'rejected'; week_start: string; focus_set: Array<{ id: string; title: string; project_title?: string | null }>; blocks: Array<{ commitment_id: string; title: string; start_at: string; duration_minutes: number; outcome_id?: string | null; project_id?: string | null }>; deferred: Array<{ id: string; title: string; reason: string }>; explanation: { constraints_considered: string[]; summary: string; ai_used: boolean; requires_approval: boolean }; requires_approval: boolean }
 
 export interface PlanExplanation {
   constraints_considered: string[];

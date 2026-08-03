@@ -7,9 +7,10 @@ interface CommitmentDraftCardProps {
   draft: CommitmentDraft;
   onUpdate: (updatedDraft: CommitmentDraft) => void;
   onReject: () => void;
+  projects?: Array<{ id: string; title: string }>;
 }
 
-export const CommitmentDraftCard: React.FC<CommitmentDraftCardProps> = ({ draft, onUpdate, onReject }) => {
+export const CommitmentDraftCard: React.FC<CommitmentDraftCardProps> = ({ draft, onUpdate, onReject, projects = [] }) => {
   const handleChange = (field: keyof CommitmentDraft, value: DraftFieldValue) => {
     onUpdate({ ...draft, [field]: value });
   };
@@ -67,6 +68,18 @@ export const CommitmentDraftCard: React.FC<CommitmentDraftCardProps> = ({ draft,
       )}
 
       <div className="my-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-faint">Planning type</label>
+          <select aria-label={`Planning type for ${draft.title}`} className="field" value={draft.kind ?? 'task'} onChange={event => handleChange('kind', event.target.value)}>
+            <option value="task">Task</option><option value="project_outcome">Outcome</option><option value="routine">Routine</option><option value="event">Event</option><option value="dependency">Reference / dependency</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-faint">Project (optional)</label>
+          <select aria-label={`Project for ${draft.title}`} className="field" value={draft.project_id ?? ''} onChange={event => handleChange('project_id', event.target.value || null)}>
+            <option value="">No project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.title}</option>)}
+          </select>
+        </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-faint">Estimated minutes</label>
           <input

@@ -16,15 +16,23 @@ class MemoryCommitments:
         self.receipts = {}
     def approve_intake(self, user_id, run_id, idempotency_key, items):
         if idempotency_key in self.receipts: return {**self.receipts[idempotency_key], "idempotent_replay": True}
-        before = copy.deepcopy((self.rows, self.tasks, self.spines))
+        before = copy.deepcopy((self.rows, self.tasks, self.spines, getattr(self, "outcomes", MemoryOwned()).rows, getattr(self, "routines", MemoryOwned()).rows))
         try:
             for item in items:
+                if item.get("kind") == "routine" and hasattr(self, "routines"):
+                    self.routines.create(user_id, {"id": item["id"], "title": item["title"], "frequency_rule": "weekly", "preferred_days": item.get("preferred_days", [0,1,2,3,4]), "preferred_time": None, "minimum_viable_version": item["minimum_viable_version"], "estimated_duration_minutes": max(5, item.get("estimated_minutes") or 5), "active": True, "continuity_json": {"recent_completions": 0, "last_status": None, "last_occurrence_date": None}})
+                    continue
+                if item.get("kind") == "project_outcome" and hasattr(self, "outcomes"):
+                    self.outcomes.create(user_id, {"id": item["id"], "project_id": item.get("project_id"), "title": item["title"], "description": item.get("description") or "", "status": "uncertain" if item.get("confidence_score", 1) < .6 else "active", "target_date": item.get("deadline_at", "")[:10] or None, "importance": item.get("importance", 3), "estimated_effort_minutes": item.get("estimated_minutes") or None, "confidence": item.get("confidence_score", .5), "completion_criteria": item["completion_criteria"], "provenance": "inbox"})
+                    continue
                 self.create(user_id, {key: value for key, value in item.items() if key not in {"tasks", "time_spine"}})
                 self.create_tasks(user_id, [{**task, "commitment_id": item["id"]} for task in item.get("tasks", [])])
                 spine = item["time_spine"]
                 self.create_time_spine(user_id, {"id": spine["id"], "commitment_id": item["id"], "spine_json": spine["stages"], "current_stage": spine["current_stage"]})
         except Exception:
-            self.rows, self.tasks, self.spines = before
+            self.rows, self.tasks, self.spines, outcome_rows, routine_rows = before
+            if hasattr(self, "outcomes"): self.outcomes.rows = outcome_rows
+            if hasattr(self, "routines"): self.routines.rows = routine_rows
             raise
         result = {"status": "success", "count": len(items), "commitment_ids": [item["id"] for item in items], "idempotent_replay": False}
         self.receipts[idempotency_key] = result
@@ -172,9 +180,67 @@ class MemoryPlanningProfiles:
     def reset(self, user_id): self.rows[user_id] = self.DEFAULTS.copy(); return self.rows[user_id]
 
 
-def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None):
+class MemoryOwned:
+    def __init__(self, rows=None): self.rows = list(rows or [])
+    def list_for_user(self, user_id): return [row for row in self.rows if row.get("user_id") == user_id]
+    def get_for_user(self, user_id, item_id): return next((row for row in self.list_for_user(user_id) if str(row["id"]) == str(item_id)), None)
+    def create(self, user_id, data):
+        row = {**data, "user_id": user_id}; self.rows.append(row); return row
+    def update(self, user_id, item_id, data):
+        row = self.get_for_user(user_id, item_id)
+        if row is None: raise RuntimeError("not found")
+        row.update(data); return row
+
+
+class MemoryProjects(MemoryOwned): pass
+
+
+class MemoryOutcomes(MemoryOwned):
+    def __init__(self, rows=None): super().__init__(rows); self.commitments = None
+    def list_for_user(self, user_id, project_id=None):
+        rows = super().list_for_user(user_id)
+        return [row for row in rows if project_id is None or str(row.get("project_id")) == str(project_id)]
+    def link_work(self, user_id, outcome_id, commitment_ids, task_ids):
+        if self.get_for_user(user_id, outcome_id) is None: raise RuntimeError("not found")
+        for row in self.commitments.list_for_user(user_id):
+            if str(row.get("id")) in set(commitment_ids): row["outcome_id"] = outcome_id
+        for row in self.commitments.list_tasks_for_user(user_id):
+            if str(row.get("id")) in set(task_ids): row["outcome_id"] = outcome_id
+
+
+class MemoryRoutines(MemoryOwned):
+    def __init__(self, rows=None): super().__init__(rows); self.occurrences = []
+    def upsert_occurrence(self, user_id, routine_id, data):
+        existing = next((row for row in self.occurrences if row["user_id"] == user_id and str(row["routine_id"]) == str(routine_id) and str(row["occurrence_date"]) == str(data["occurrence_date"])), None)
+        if existing: existing.update(data); return existing
+        row = {**data, "id": str(uuid.uuid4()), "routine_id": routine_id, "user_id": user_id}; self.occurrences.append(row); return row
+    def list_occurrences(self, user_id, start_at, end_at):
+        return [row for row in self.occurrences if row["user_id"] == user_id and start_at.date() <= datetime.fromisoformat(str(row["occurrence_date"])).date() < end_at.date()]
+
+
+class MemoryWeeklyPlans(MemoryOwned):
+    def __init__(self, rows=None): super().__init__(rows); self.receipts = {}; self.focus = None
+    def approve(self, user_id, plan_id, idempotency_key, block_ids):
+        if idempotency_key in self.receipts: return {**self.receipts[idempotency_key], "idempotent_replay": True}
+        snapshot = copy.deepcopy((self.rows, self.focus.rows))
+        try:
+            plan = self.get_for_user(user_id, plan_id)
+            if not plan or plan.get("status") != "pending" or len(plan["proposal_json"]["blocks"]) != len(block_ids): raise RuntimeError("invalid weekly plan")
+            for block, block_id in zip(plan["proposal_json"]["blocks"], block_ids):
+                start = datetime.fromisoformat(str(block["start_at"]).replace("Z", "+00:00"))
+                self.focus.create(user_id, {"id": block_id, "commitment_id": block["commitment_id"], "title": block["title"], "start_at": start.isoformat(), "end_at": (start + timedelta(minutes=block["duration_minutes"])).isoformat(), "block_type": "deep_work", "status": "scheduled"})
+            plan["status"] = "approved"
+        except Exception:
+            self.rows, self.focus.rows = snapshot
+            raise
+        result = {"status": "approved", "block_ids": block_ids, "idempotent_replay": False}; self.receipts[idempotency_key] = result; return result
+
+
+def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None, projects=None, outcomes=None, routines=None, weekly_plans=None):
     commitments = commitments or MemoryCommitments(); focus = focus or MemoryFocus(); planning = planning or MemoryPlanning(); reflections = reflections or MemoryReflections(); traces = traces or MemoryTraces()
     commitments.traces = traces
     focus.commitments = commitments; focus.reflections = reflections
     planning.focus = focus; planning.traces = traces
-    return RepositorySet(commitments, focus, planning, reflections, traces, google or MemoryGoogle(), profiles or MemoryPlanningProfiles())
+    projects = projects or MemoryProjects(); outcomes = outcomes or MemoryOutcomes(); routines = routines or MemoryRoutines(); weekly_plans = weekly_plans or MemoryWeeklyPlans()
+    outcomes.commitments = commitments; weekly_plans.focus = focus; commitments.outcomes = outcomes; commitments.routines = routines
+    return RepositorySet(commitments, focus, planning, reflections, traces, google or MemoryGoogle(), profiles or MemoryPlanningProfiles(), projects, outcomes, routines, weekly_plans)

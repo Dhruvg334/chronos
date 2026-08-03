@@ -101,6 +101,10 @@ async def approve_intake(
     agent_run_id = str(request.agent_run_id)
     items = []
     for draft in request.approved_drafts:
+        if draft.project_id and not repositories.projects.get_for_user(user_id, str(draft.project_id)):
+            raise HTTPException(status_code=400, detail="Selected project not found.")
+        if draft.outcome_id and not repositories.outcomes.get_for_user(user_id, str(draft.outcome_id)):
+            raise HTTPException(status_code=400, detail="Selected outcome not found.")
         deadline_at = _parse_dt(draft.deadline_at)
         start_before_at = _parse_dt(draft.start_before_at)
         risk_score, risk_level, warnings = calculate_core_risk(
@@ -118,6 +122,12 @@ async def approve_intake(
             "importance": draft.importance, "flexibility": draft.flexibility,
             "progress_percent": 0, "risk_score": risk_score, "risk_level": risk_level,
             "confidence_score": draft.confidence_score,
+            "kind": draft.kind,
+            "project_id": str(draft.project_id) if draft.project_id else None,
+            "outcome_id": str(draft.outcome_id) if draft.outcome_id else None,
+            "completion_criteria": draft.done_condition or f"{draft.title} is complete.",
+            "minimum_viable_version": draft.next_action or f"Do a five-minute version of {draft.title}.",
+            "preferred_days": repositories.planning_profiles.get(user_id).get("available_weekdays", [0, 1, 2, 3, 4]),
             "tasks": [{
                 "id": str(uuid.uuid4()), "title": task.title,
                 "next_action": getattr(task, "next_action", None),
@@ -149,4 +159,4 @@ async def approve_intake(
     key = idempotency_key or f"intake-{agent_run_id}"
     result = repositories.commitments.approve_intake(user_id, agent_run_id, key, items)
     count = int(result["count"])
-    return ApproveCommitmentsResponse(status="success", count=count, message=f"Successfully approved {count} commitments.")
+    return ApproveCommitmentsResponse(status="success", count=count, message=f"Successfully approved {count} planning items.")

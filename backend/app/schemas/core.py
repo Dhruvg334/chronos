@@ -14,6 +14,8 @@ class NextActionView(BaseModel):
     title: str
     detail: str
     estimated_minutes: int
+    project: dict | None = None
+    outcome: dict | None = None
 
 
 class PlanItemView(BaseModel):
@@ -57,6 +59,7 @@ class TodayResponse(BaseModel):
     active_focus_session: ActiveFocusView | None = None
     recovery: RecoveryView | None = None
     explanation: dict | None = None
+    routines_due: list[dict] = Field(default_factory=list, max_length=6)
 
 
 class StrategyRecommendationRequest(BaseModel):

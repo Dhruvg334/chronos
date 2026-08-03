@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Session } from '@supabase/supabase-js';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,8 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from '../App';
 import { AuthContext, type AuthContextType } from '../components/auth/auth-context';
 import Plan from '../pages/Plan';
+import Projects from '../pages/Projects';
+import Week from '../pages/Week';
 import Settings from '../pages/Settings';
 import Today from '../pages/Today';
+import { CommitmentDraftCard } from '../components/intake/CommitmentDraftCard';
 import type { ActiveFocusSession, PlanResponse, TodayResponse } from '../types/api';
 
 const session = { user: { email: 'person@example.com' }, access_token: 'test-token' } as unknown as Session;
@@ -19,11 +22,14 @@ let overCapacity: boolean;
 let profileFailure: boolean;
 let transactionFailure: boolean;
 let savedProfile: Record<string, unknown> | null;
+let projectExists: boolean;
+let outcomeExists: boolean;
+let routines: Array<Record<string, unknown>>;
 
 const planningProfile = { timezone: 'Asia/Kolkata', available_weekdays: [0, 1, 2, 3, 4, 5], working_start_time: '09:30:00', working_end_time: '18:30:00', daily_focus_limit_minutes: 300, default_focus_duration_minutes: 45, minimum_transition_buffer_minutes: 10, minimum_daily_unscheduled_buffer_minutes: 60, protected_interval_start: '13:00:00', protected_interval_end: '14:00:00', quick_task_threshold_minutes: 5 };
 
 function todayData(): TodayResponse {
-  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60 }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { commitment_id: 'c1', title: 'Make the plan credible again', reason: 'The deadline is close.', options: ['Define a smaller next step'], requires_approval: true }, explanation: { constraints_considered: ['risk', 'deadline', 'calendar'], next_action_reason: 'Highest-ranked executable commitment.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true } };
+  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60, project: { id: 'p1', title: 'ChronOS Production Release' }, outcome: { id: 'o1', title: 'Stable authentication and session handling' } }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { commitment_id: 'c1', title: 'Make the plan credible again', reason: 'The deadline is close.', options: ['Define a smaller next step'], requires_approval: true }, explanation: { constraints_considered: ['risk', 'deadline', 'calendar'], next_action_reason: 'Highest-ranked executable commitment.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true }, routines_due: [{ id: 'r1', title: 'Daily release review', preferred_time: '18:00', duration_minutes: 20, minimum_viable_version: '5-minute blocker review' }] };
 }
 
 function planData(): PlanResponse {
@@ -39,8 +45,23 @@ beforeEach(() => {
   profileFailure = false;
   transactionFailure = false;
   savedProfile = null;
+  projectExists = false;
+  outcomeExists = false;
+  routines = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith('/api/v1/projects') && init?.method === 'POST') { projectExists = true; return json({ id: 'p1', title: 'ChronOS Production Release', description: '', status: 'active', colour: 'accent', outcome_count: 0, completed_outcome_count: 0, progress_percent: 0 }); }
+    if (url.endsWith('/api/v1/projects')) return json({ projects: projectExists ? [{ id: 'p1', title: 'ChronOS Production Release', description: 'Ship safely', status: 'active', colour: 'accent', outcome_count: outcomeExists ? 1 : 0, completed_outcome_count: 0, progress_percent: 0, next_action: 'Authentication fix' }] : [] });
+    if (url.endsWith('/api/v1/projects/p1/outcomes') && init?.method === 'POST') { outcomeExists = true; return json({ id: 'o1' }); }
+    if (url.endsWith('/api/v1/projects/p1')) return json({ id: 'p1', title: 'ChronOS Production Release', description: 'Ship safely', status: 'active', colour: 'accent', outcome_count: outcomeExists ? 1 : 0, completed_outcome_count: 0, progress_percent: 0, next_action: 'Authentication fix', outcomes: outcomeExists ? [{ id: 'o1', project_id: 'p1', title: 'Production deployment', description: '', status: 'active', importance: 5, confidence: .8, completion_criteria: 'Service is healthy' }] : [], linked_commitments: [], available_commitments: [] });
+    if (url.endsWith('/api/v1/routines') && init?.method === 'POST') { routines = [{ id: 'r1', title: 'Daily release review', frequency_rule: 'weekly', preferred_days: [0,1,2,3,4,5], preferred_time: '18:00', minimum_viable_version: '5-minute blocker review', estimated_duration_minutes: 20, active: true, occurrences: [] }]; return json(routines[0]); }
+    if (url.endsWith('/api/v1/routines')) return json({ routines });
+    if (url.endsWith('/api/v1/routines/r1') && init?.method === 'PUT') { routines[0] = { ...routines[0], active: false }; return json(routines[0]); }
+    if (url.includes('/api/v1/week/proposals/') && url.endsWith('/approve')) return json({ status: 'approved', block_ids: ['wb1'] });
+    if (url.includes('/api/v1/week/proposals/') && url.endsWith('/reject')) return json({ id: 'wp1', status: 'rejected' });
+    if (url.includes('/api/v1/week/proposals/wp1') && init?.method === 'PUT') return json({ id: 'wp1', status: 'pending', week_start: '2026-08-03', focus_set: [], blocks: JSON.parse(String(init.body)).blocks, deferred: [], explanation: { constraints_considered: ['capacity'], summary: 'Edited and valid.', ai_used: false, requires_approval: true }, requires_approval: true });
+    if (url.includes('/api/v1/week/proposals') && init?.method === 'POST') return json({ id: 'wp1', status: 'pending', week_start: '2026-08-03', focus_set: [{ id: 'o1', title: 'Stable authentication' }], blocks: [{ commitment_id: 'c1', title: 'Authentication fix', start_at: '2026-08-03T10:00:00+05:30', duration_minutes: 45, outcome_id: 'o1', project_id: 'p1' }], deferred: [{ id: 'c2', title: 'Slides', reason: 'No conflict-free capacity remained.' }], explanation: { constraints_considered: ['availability', 'calendar'], summary: 'A small focus set fits.', ai_used: false, requires_approval: true }, requires_approval: true });
+    if (url.includes('/api/v1/week?')) return json({ week_start: '2026-08-03', timezone: 'Asia/Kolkata', days: Array.from({ length: 7 }, (_, index) => ({ date: `2026-08-0${index + 3}`, available_minutes: index === 6 ? 0 : 300, scheduled_minutes: 0, remaining_minutes: index === 6 ? 0 : 300, buffer_minutes: 60, over_capacity_minutes: 0, confidence: 'medium', sources: ['personal_availability'] })), due_outcomes: [{ id: 'o1', title: 'Stable authentication', description: '', status: 'active', importance: 5, confidence: .8, completion_criteria: 'Tests pass' }], unscheduled_work: [{ id: 'c1', user_id: 'u1', title: 'Authentication fix', status: 'active' }], routine_occurrences: [], active_projects: [], primary_strategy: recommendation });
     if (url.endsWith('/api/v1/today')) return json(todayData());
     if (url.includes('/api/v1/plan/adaptive/') && url.endsWith('/approve')) return json({ status: 'approved', block_ids: ['b1'] });
     if (url.endsWith('/api/v1/plan/adaptive')) return json({ workflow_id: 'w1', proposal_id: 'p1', recommended_plan: { label: 'Protect the fix', summary: 'One conflict-free block.', feasibility: 'valid', blocks: [{ commitment_id: 'c1', start_at: '2026-08-04T10:00:00Z', duration_minutes: 60, rationale: 'Highest-risk executable outcome.' }], deferred_commitment_ids: [] }, explanation: { constraints_considered: ['availability', 'calendar', 'dependencies'], next_action_reason: 'The fix is urgent and executable.', deferred: ['Slides'], changed: 'A proposal was prepared; no plan data changed.', ai_used: true, requires_approval: true }, rejected_candidate_count: 1, requires_approval: true });
@@ -216,6 +237,82 @@ it('keeps recovery and reflection contextual instead of primary navigation', asy
   expect(await screen.findByRole('heading', { name: /make the plan credible again/i })).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /prepare recovery recommendation/i }));
   expect(await screen.findByText(/prepared for approval/i)).toBeInTheDocument();
+});
+
+it('renders the Projects empty state and creates a project', async () => {
+  const user = userEvent.setup(); renderWithContext(<Projects />, { path: '/projects' });
+  expect(await screen.findByText('No projects yet')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /create project/i }));
+  await user.type(screen.getByLabelText('Project title'), 'ChronOS Production Release');
+  await user.click(screen.getAllByRole('button', { name: /create project/i })[1]);
+  expect(await screen.findByText('Project created.')).toBeInTheDocument();
+  expect(await screen.findByText('ChronOS Production Release')).toBeInTheDocument();
+});
+
+it('renders project detail and creates a distinct outcome', async () => {
+  projectExists = true; const user = userEvent.setup(); renderWithContext(<AppRoutes />, { path: '/projects/p1' });
+  expect(await screen.findByRole('heading', { name: 'ChronOS Production Release' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /add outcome/i }));
+  await user.type(screen.getByLabelText('Outcome title'), 'Production deployment');
+  await user.type(screen.getByLabelText('Completion criteria'), 'Service is healthy');
+  await user.click(screen.getByRole('button', { name: /create outcome/i }));
+  expect(await screen.findByText('Outcome created.')).toBeInTheDocument();
+  expect(await screen.findByText('Complete when: Service is healthy')).toBeInTheDocument();
+});
+
+it('creates and pauses a routine within Plan', async () => {
+  const user = userEvent.setup(); renderWithContext(<Plan />, { path: '/plan' });
+  await user.click(await screen.findByRole('button', { name: /add routine/i }));
+  await user.type(screen.getByLabelText('Routine title'), 'Daily release review');
+  await user.type(screen.getByLabelText('Minimum viable version'), '5-minute blocker review');
+  await user.click(screen.getByRole('button', { name: /create routine/i }));
+  expect(await screen.findByText('Routine created.')).toBeInTheDocument();
+  await user.click(await screen.findByRole('button', { name: 'Pause' }));
+  expect(await screen.findByRole('button', { name: 'Resume' })).toBeInTheDocument();
+});
+
+it('renders weekly capacity and accepts an approved proposal', async () => {
+  const user = userEvent.setup(); renderWithContext(<Week />, { path: '/week' });
+  expect((await screen.findAllByText('300 min')).length).toBeGreaterThan(0);
+  await user.click(screen.getByRole('button', { name: /suggest weekly focus/i }));
+  expect(await screen.findByRole('heading', { name: /small weekly focus set/i })).toBeInTheDocument();
+  expect(screen.getByText(/No conflict-free capacity remained/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /accept weekly plan/i }));
+  expect(await screen.findByText(/weekly plan approved/i)).toBeInTheDocument();
+});
+
+it('edits and rejects a weekly proposal without creating blocks', async () => {
+  const user = userEvent.setup(); renderWithContext(<Week />, { path: '/week' });
+  await user.click(await screen.findByRole('button', { name: /suggest weekly focus/i }));
+  await user.selectOptions(await screen.findByLabelText(/duration for authentication fix/i), '60');
+  await user.click(screen.getByRole('button', { name: /save edits/i }));
+  expect(await screen.findByText(/updated and revalidated/i)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /reject suggestion/i }));
+  expect(await screen.findByText(/suggestion rejected/i)).toBeInTheDocument();
+});
+
+it('shows compact project context and routines on Today', async () => {
+  renderWithContext(<Today />, { path: '/today' });
+  expect(await screen.findByText(/ChronOS Production Release/)).toBeInTheDocument();
+  expect(screen.getByText(/Stable authentication and session handling/)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Routines' })).toBeInTheDocument();
+});
+
+it('allows optional Inbox project assignment and type classification', async () => {
+  const user = userEvent.setup(); const onUpdate = vi.fn();
+  renderWithContext(<CommitmentDraftCard draft={{ title: 'Production deployment', type: 'hard_deadline', importance: 5, flexibility: 2, tasks: [], missing_fields: [], confidence_score: .8, kind: 'task' }} onUpdate={onUpdate} onReject={vi.fn()} projects={[{ id: 'p1', title: 'ChronOS Production Release' }]} />);
+  await user.selectOptions(screen.getByLabelText(/planning type for production deployment/i), 'project_outcome');
+  expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'project_outcome' }));
+  await user.selectOptions(screen.getByLabelText(/project for production deployment/i), 'p1');
+  expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ project_id: 'p1' }));
+});
+
+it('keeps responsive primary navigation concise and functional', async () => {
+  renderWithContext(<Today />, { path: '/today' });
+  const navigation = await screen.findByRole('navigation', { name: /primary/i });
+  for (const label of ['Today', 'Inbox', 'Plan', 'Projects']) expect(within(navigation).getByText(label)).toBeInTheDocument();
+  expect(within(navigation).queryByText('Week')).not.toBeInTheDocument();
+  expect(within(navigation).queryByText('Routines')).not.toBeInTheDocument();
 });
 
 describe('auth boundary', () => {
