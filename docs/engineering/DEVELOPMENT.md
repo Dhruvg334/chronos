@@ -37,3 +37,5 @@ $env:RUN_GOOGLE_INTEGRATION='1'  # requires a disposable Vault-connected Google 
 python -m pytest -m integration -vv
 python -m evals.run
 ```
+
+Production frontend and API configuration is documented in [DEPLOYMENT.md](DEPLOYMENT.md). The frontend is a static Netlify build; backend credentials stay exclusively on the separately hosted FastAPI service.

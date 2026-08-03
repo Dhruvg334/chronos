@@ -9,9 +9,9 @@
 - Return stable public errors with request IDs. Keep diagnostic context in redacted structured logs.
 - Keep `/demo` static and isolated from user workspaces.
 
-Applied migrations 001–022 are immutable. Migration 017 protects OAuth tokens through Vault; its historical SQL text is retained because changing applied migration history is prohibited.
+Applied migrations 001–023 are immutable. Migration 017 protects OAuth tokens through Vault; its historical SQL text is retained because changing applied migration history is prohibited.
 
-Core transaction functions are `SECURITY DEFINER` with a restricted `pg_catalog, public` search path. They validate ownership, lock per idempotency key, and revoke execution from `PUBLIC` and `anon`. Only `authenticated` and `service_role` can execute them. RLS remains enabled on operation receipts and every user-owned core table.
+Core transaction functions use restricted `SECURITY DEFINER` search paths. Migration 023 narrows `approve_adaptive_plan_transaction` to `pg_catalog` only; every application and authentication object remains explicitly schema-qualified. The functions validate ownership, lock per idempotency key, and revoke execution from `PUBLIC` and `anon`. Only `authenticated` and `service_role` can execute them. RLS remains enabled on operation receipts and every user-owned core table.
 
 `approve_adaptive_plan_transaction` locks the owned pending proposal, validates owned executable commitments and current overlaps, inserts all blocks, changes approval state, writes a concise trace, and records the idempotent result in one transaction. API validation additionally enforces profile hours, protected intervals, transitions, deadlines, and capacity before invoking the RPC.
 

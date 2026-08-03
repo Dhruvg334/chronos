@@ -48,7 +48,7 @@ async def test_structured_response_and_one_bounded_repair(gateway):
     result = await gateway.generate_structured(ModelRequest(prompt="private user wording"), Result)
     assert result.value.value == 7 and result.repair_attempts == 1
     assert len(StubClient.requests) == 2
-    assert "private user wording" not in StubClient.requests[1]["json"]["messages"][-1]["content"]
+    assert "private user wording" in StubClient.requests[1]["json"]["messages"][-1]["content"]
 
 
 @pytest.mark.anyio
@@ -59,6 +59,18 @@ async def test_invalid_model_response_stops_after_repair(gateway, caplog):
     assert raised.value.code == ErrorCode.MODEL_OUTPUT_INVALID
     assert len(StubClient.requests) == 2
     assert "sensitive raw prompt" not in caplog.text and "secret-key" not in caplog.text
+
+
+@pytest.mark.anyio
+async def test_provider_json_validation_failure_uses_one_bounded_repair(gateway):
+    StubClient.queue.extend([
+        response(400, {"error": {"type": "invalid_request_error", "code": "json_validate_failed", "failed_generation": "private raw output"}}),
+        response(200, {"choices": [{"message": {"content": '{"value":9}'}}]}),
+    ])
+    result = await gateway.generate_structured(ModelRequest(prompt="private user wording"), Result)
+    assert result.value.value == 9 and result.repair_attempts == 1
+    assert len(StubClient.requests) == 2
+    assert "private user wording" in StubClient.requests[1]["json"]["messages"][-1]["content"]
 
 
 @pytest.mark.anyio

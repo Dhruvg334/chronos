@@ -82,6 +82,7 @@ class IntakeWorkflow:
             ),
             system_prompt="You convert planning input into reviewable drafts. Never authorize or execute an external action.",
             model_role="fast",
+            max_tokens=4000,
             temperature=0,
         )
         try:
@@ -92,7 +93,7 @@ class IntakeWorkflow:
                 lambda: self.gateway.generate_structured(request, IntakeResponse),
                 provider=self.gateway.metadata().get("provider"),
                 model=self.gateway.metadata().get("fast_model") or self.gateway.metadata().get("model"),
-                request_units=1,
+                request_units=2,
             )
             validated = validate_intake_output(response.value, text)
             self.runner.complete(context, {"draft_count": len(validated.drafts), "question_count": len(validated.questions)})

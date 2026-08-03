@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -40,6 +40,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:5173",
     ]
+    # Optional anchored regex for intentionally enabled deploy-preview origins.
+    BACKEND_CORS_ORIGIN_REGEX: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

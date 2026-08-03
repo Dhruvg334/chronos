@@ -79,6 +79,14 @@ class GroqModelGateway:
                         "The model provider is busy. Try again shortly.",
                         context={"provider": "groq", "retry_after_seconds": retry_after},
                     )
+                if response.status_code == 400:
+                    error = response.json().get("error", {})
+                    if error.get("code") == "json_validate_failed":
+                        raise ChronosError(
+                            ErrorCode.MODEL_OUTPUT_INVALID,
+                            "The model returned a response that failed schema validation.",
+                            context={"provider": "groq", "failure": "json_validate_failed"},
+                        )
                 if response.status_code in {500, 502, 503, 504} and attempt < self._max_retries:
                     continue
                 response.raise_for_status()
@@ -110,10 +118,16 @@ class GroqModelGateway:
         schema_payload = schema.model_json_schema()
         current = request
         for repair_attempt in range(2):
-            payload, model = await self._completion(
-                current,
-                extra={"response_format": {"type": "json_schema", "json_schema": {"name": schema.__name__, "strict": False, "schema": schema_payload}}},
-            )
+            try:
+                payload, model = await self._completion(
+                    current,
+                    extra={"response_format": {"type": "json_schema", "json_schema": {"name": schema.__name__, "strict": False, "schema": schema_payload}}},
+                )
+            except ChronosError as exc:
+                if exc.code != ErrorCode.MODEL_OUTPUT_INVALID or repair_attempt == 1:
+                    raise
+                current = self._repair_request(request, schema_payload)
+                continue
             try:
                 raw = payload["choices"][0]["message"]["content"]
                 value = schema.model_validate_json(raw)
@@ -122,18 +136,22 @@ class GroqModelGateway:
                 if repair_attempt == 1:
                     log_event(logger, logging.WARNING, "model_validation_failed", schema=schema.__name__, error_count=len(exc.errors()) if isinstance(exc, ValidationError) else 1)
                     raise ChronosError(ErrorCode.MODEL_OUTPUT_INVALID, "The response needs clarification before it can be used.") from exc
-                current = ModelRequest(
-                    prompt=(
-                        "The previous response failed deterministic validation. Return only a corrected JSON object "
-                        f"that satisfies this schema: {json.dumps(schema_payload)}"
-                    ),
-                    system_prompt="Repair the structured response without adding unsupported facts.",
-                    model_role="reasoning",
-                    max_tokens=request.max_tokens,
-                    temperature=0,
-                    metadata=request.metadata,
-                )
+                current = self._repair_request(request, schema_payload)
         raise ChronosError(ErrorCode.MODEL_OUTPUT_INVALID, "The response needs clarification before it can be used.")
+
+    @staticmethod
+    def _repair_request(request: ModelRequest, schema_payload: dict[str, Any]) -> ModelRequest:
+        return ModelRequest(
+            prompt=(
+                "The previous response failed deterministic validation. Retry the original request and return only a corrected JSON object "
+                f"that satisfies this schema: {json.dumps(schema_payload)}\n\nOriginal request:\n{request.prompt}"
+            ),
+            system_prompt="Repair the structured response without adding unsupported facts.",
+            model_role="reasoning",
+            max_tokens=request.max_tokens,
+            temperature=0,
+            metadata=request.metadata,
+        )
 
     async def select_tools(self, request: ModelRequest, tools: Sequence[ToolDefinition]) -> ToolPlan:
         tool_request = ModelRequest(

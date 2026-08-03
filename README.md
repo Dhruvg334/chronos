@@ -58,6 +58,7 @@ Copy `.env.example` values into environment-specific files and replace placehold
 - [Security model](docs/architecture/SECURITY_MODEL.md)
 - [Development](docs/engineering/DEVELOPMENT.md)
 - [Testing](docs/engineering/TESTING.md)
+- [Deployment](docs/engineering/DEPLOYMENT.md)
 - [Roadmap](docs/ROADMAP.md)
 
 See [AGENTS.md](AGENTS.md) before changing the repository.
