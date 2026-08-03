@@ -6,6 +6,8 @@ The React frontend owns presentation and client interactions. TanStack Query own
 
 FastAPI owns authentication, deterministic planning, model access, bounded workflows, overlap and capacity validation, repositories, and integration adapters. `ApplicationContainer` constructs live clients lazily; imports do not open network clients.
 
+Groq is accessed only through the provider-neutral `ModelGateway`. Structured responses receive Pydantic validation and at most one bounded repair request. Intake, adaptive planning, and adaptive recovery reserve that repair inside their workflow request budgets. Provider prompts and raw responses are not written to traces or logs.
+
 Application code targets protocols in `app/repositories` and `app/models`. Supabase and Groq are adapters. The `core.database` facade remains only for historical paths listed below and must not be used by new core-journey code.
 
 ## Core journey
@@ -13,6 +15,12 @@ Application code targets protocols in `app/repositories` and `app/models`. Supab
 `GET /api/v1/today` composes active commitments, tasks, today’s cached calendar events, focus blocks, pending approvals, active focus state, one deterministic next action, optional recovery context, and at most one Strategy Engine recommendation.
 
 `GET /api/v1/plan` composes calendar events, focus blocks, unscheduled commitments, and profile-driven capacity. The deterministic engine applies the user's IANA timezone, available weekdays, working window, protected interval, daily focus limit, transition buffer, unscheduled reserve, calendar state, and deadline window. It returns remaining and over-capacity minutes with confidence and source metadata. `POST /api/v1/plan/blocks` validates ownership, availability, protected time, transitions, overlap, and capacity before a write.
+
+`POST /api/v1/plan/adaptive` loads the same deterministic context, asks the model for at most three small candidate plans, rejects dependency, overlap, availability, deadline, and capacity violations, and persists only the best valid pending proposal. Approval revalidates current state and migration 022 applies all proposed focus blocks plus proposal/trace state atomically.
+
+Adaptive recovery uses deterministic evidence to classify overload, interruption, ambiguity, dependency blocking, underestimated duration, start friction, sufficiently evidenced low energy, or calendar disruption. The model may phrase at most three options; feasibility remains deterministic. Provider failure degrades to one deterministic option without external action.
+
+Calendar capacity distinguishes live, cached, stale, unavailable, disconnected, and configuration-missing states. Fresh or cached Google events remain read-only. Stale/provider-unavailable states expose reduced confidence and retry; disconnected planning ignores Google cache while retaining local events.
 
 Focus lifecycle endpoints create or start a session, persist pause/resume timing, expose deterministic stuck options, record completion reflection, update observed progress/risk, and invalidate Today/Plan queries in the UI. Recovery and reflection are contextual rather than primary routes.
 
@@ -22,4 +30,4 @@ Repository-backed core paths: intake workflow runs and traces; approved commitme
 
 Compatibility access remains in legacy calendar, command, and scheduling API modules; the legacy scheduling and rescue graphs; and Google OAuth/calendar infrastructure adapters. These paths are outside Today, Inbox approval, Plan, Focus, contextual recovery, contextual reflection, and commitment detail. The compatibility client also remains at the API dependency construction boundary until historical routes move to the application container.
 
-Migration 019 adds focus lifecycle state, migration 020 adds the planning profile, and migration 021 adds idempotent transaction RPCs and operation receipts. Intake approval, focus completion, and recovery approval perform their related writes atomically in PostgreSQL.
+Migration 019 adds focus lifecycle state, migration 020 adds the planning profile, migration 021 adds core idempotent transaction RPCs and operation receipts, and migration 022 adds atomic adaptive-plan approval. Intake approval, focus completion, recovery approval, and adaptive-plan approval perform their related writes atomically in PostgreSQL.

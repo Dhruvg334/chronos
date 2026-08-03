@@ -1,0 +1,7 @@
+[
+  {"missing":["estimated_minutes"],"question_fields":["estimated_minutes"],"expected_necessary":["estimated_minutes"]},
+  {"missing":["deadline_at","estimated_minutes"],"question_fields":["deadline_at","estimated_minutes"],"expected_necessary":["deadline_at","estimated_minutes"]},
+  {"missing":[],"question_fields":[],"expected_necessary":[]},
+  {"missing":["duration"],"question_fields":["duration"],"expected_necessary":["duration"]},
+  {"missing":["estimated_minutes","nice_to_have"],"question_fields":["estimated_minutes"],"expected_necessary":["estimated_minutes"]}
+]

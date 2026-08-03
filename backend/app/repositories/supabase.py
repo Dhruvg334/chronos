@@ -157,6 +157,20 @@ class SupabaseFocusRepository(_BaseRepository):
 
 
 class SupabasePlanningRepository(_BaseRepository):
+    def approve_adaptive_plan(self, user_id: str, proposal_id: str, idempotency_key: str, block_ids: list[str]) -> dict[str, Any]:
+        try:
+            result = self.client.rpc("approve_adaptive_plan_transaction", {
+                "p_user_id": user_id,
+                "p_proposal_id": proposal_id,
+                "p_idempotency_key": idempotency_key,
+                "p_block_ids": block_ids,
+            }).execute().data
+            if result.get("status") == "failed":
+                raise RuntimeError(result.get("error_code"))
+            return result
+        except Exception as exc:
+            raise self._failure("adaptive_plan.approve_transaction", exc) from exc
+
     def approve_recovery(self, user_id: str, proposal_id: str, idempotency_key: str, focus_block_id: str | None) -> dict[str, Any]:
         try:
             result = self.client.rpc("approve_recovery_transaction", {"p_user_id": user_id, "p_proposal_id": proposal_id, "p_idempotency_key": idempotency_key, "p_focus_block_id": focus_block_id}).execute().data

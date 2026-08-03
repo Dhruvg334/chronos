@@ -56,6 +56,7 @@ class TodayResponse(BaseModel):
     pending_approval_count: int
     active_focus_session: ActiveFocusView | None = None
     recovery: RecoveryView | None = None
+    explanation: dict | None = None
 
 
 class StrategyRecommendationRequest(BaseModel):
@@ -79,6 +80,8 @@ class CapacityView(BaseModel):
     confidence: Literal["low", "medium", "high"]
     sources: tuple[str, ...]
     calendar_state: str
+    last_successful_sync: str | None = None
+    retry_available: bool = False
 
 
 class PlanResponse(BaseModel):
@@ -91,6 +94,7 @@ class PlanResponse(BaseModel):
     ordered_timeline: list[PlanItemView]
     capacity: CapacityView
     buffer_guidance: str
+    explanation: dict | None = None
 
 
 class CreatePlanBlockRequest(BaseModel):

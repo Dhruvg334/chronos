@@ -1,0 +1,7 @@
+[
+  {"commitment":{"status":"blocked","type":"waiting_on","description":"Done","confidence_score":0.9},"reflections":[],"over_capacity":0,"calendar_state":"live","expected":"dependency_blocked"},
+  {"commitment":{"status":"active","type":"hard_deadline","description":null,"confidence_score":0.5},"reflections":[],"over_capacity":0,"calendar_state":"live","expected":"ambiguity"},
+  {"commitment":{"status":"active","type":"hard_deadline","description":"Done","confidence_score":0.9},"reflections":[],"over_capacity":60,"calendar_state":"live","expected":"overload"},
+  {"commitment":{"status":"active","type":"hard_deadline","description":"Done","confidence_score":0.9},"reflections":[],"over_capacity":0,"calendar_state":"stale","expected":"calendar_disruption"},
+  {"commitment":{"status":"active","type":"hard_deadline","description":"Done","confidence_score":0.9,"estimated_minutes":60,"actual_minutes":80,"progress_percent":50},"reflections":[],"over_capacity":0,"calendar_state":"live","expected":"underestimated_duration"}
+]

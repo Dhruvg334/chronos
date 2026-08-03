@@ -1,0 +1,7 @@
+[
+  {"selected":"load_calendar","allowed":["load_calendar","load_commitments"],"expected_valid":true},
+  {"selected":"write_calendar","allowed":["load_calendar"],"expected_valid":false},
+  {"selected":"load_commitments","allowed":["load_calendar","load_commitments"],"expected_valid":true},
+  {"selected":"approve_plan","allowed":["propose_plan"],"expected_valid":false},
+  {"selected":"propose_plan","allowed":["propose_plan"],"expected_valid":true}
+]

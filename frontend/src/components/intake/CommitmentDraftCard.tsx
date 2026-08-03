@@ -34,7 +34,7 @@ export const CommitmentDraftCard: React.FC<CommitmentDraftCardProps> = ({ draft,
           />
           <div className="mt-2 flex items-center gap-2 text-xs">
             <span className="rounded-md bg-surface-subtle px-2 py-1 font-medium uppercase tracking-wider text-muted">
-              {draft.type}
+              {(draft.kind ?? draft.type).replaceAll('_', ' ')}
             </span>
             <span className={`rounded-md px-2 py-1 font-medium ${confidenceClass}`}>
               {Math.round(draft.confidence_score * 100)}% match
@@ -51,6 +51,20 @@ export const CommitmentDraftCard: React.FC<CommitmentDraftCardProps> = ({ draft,
           </svg>
         </button>
       </div>
+
+      {(draft.source_text || draft.effort_confidence === 'unknown' || draft.deadline_precision === 'ambiguous') && (
+        <div className="mb-4 rounded-lg bg-surface-subtle p-3 text-xs text-muted">
+          {draft.source_text && <p>From your wording: “{draft.source_text}”</p>}
+          {draft.effort_confidence === 'unknown' && <p className="mt-1">Effort is still uncertain.</p>}
+          {draft.deadline_precision === 'ambiguous' && <p className="mt-1">The deadline is a window, not an exact time.</p>}
+        </div>
+      )}
+
+      {(draft.dependencies?.length ?? 0) > 0 && (
+        <div className="mb-4 rounded-lg border border-line bg-accent-soft p-3 text-sm text-accent-strong">
+          <strong>Waiting on:</strong> {draft.dependencies!.join(', ')}
+        </div>
+      )}
 
       <div className="my-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>

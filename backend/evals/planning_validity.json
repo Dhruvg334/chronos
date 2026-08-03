@@ -1,0 +1,7 @@
+[
+  {"working":[570,1110],"protected":[780,840],"existing":[[660,720]],"candidate":[900,960],"buffer":10,"expected_valid":true},
+  {"working":[570,1110],"protected":[780,840],"existing":[],"candidate":[795,825],"buffer":10,"expected_valid":false},
+  {"working":[570,1110],"protected":null,"existing":[[660,720]],"candidate":[715,750],"buffer":10,"expected_valid":false},
+  {"working":[570,1110],"protected":null,"existing":[],"candidate":[540,600],"buffer":10,"expected_valid":false},
+  {"working":[570,1110],"protected":null,"existing":[[870,915]],"candidate":[925,970],"buffer":10,"expected_valid":true}
+]

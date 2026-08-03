@@ -9,7 +9,8 @@ import {
   Surface,
 } from "../components/ui/primitives";
 import { apiFetch, apiUrl, getApiErrorMessage } from "../lib/api";
-import type { PlanItem, PlanResponse } from "../types/api";
+import { WhyThisPlan } from "../components/planning/WhyThisPlan";
+import type { AdaptivePlanResponse, PlanItem, PlanResponse } from "../types/api";
 
 function localDateValue(date: Date) {
   const offset = date.getTimezoneOffset() * 60_000;
@@ -24,6 +25,13 @@ function dayRange(value: string) {
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   return { start, end };
+}
+function calendarCapacityLabel(state: string) {
+  if (state === "live") return "Live calendar plus profile";
+  if (state === "cached") return "Cached calendar plus profile";
+  if (state === "stale") return "Stale calendar cache plus profile";
+  if (state === "unavailable") return "Calendar unavailable; using cached events or profile";
+  return "Profile-only planning";
 }
 async function loadPlan(date: string): Promise<PlanResponse> {
   const { start, end } = dayRange(date);
@@ -106,6 +114,37 @@ export default function Plan() {
       ]);
     },
   });
+  const adaptive = useMutation({
+    mutationFn: async (): Promise<AdaptivePlanResponse> => {
+      const { start, end } = dayRange(date);
+      const response = await apiFetch(apiUrl("/api/v1/plan/adaptive"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start_at: start.toISOString(), end_at: end.toISOString() }),
+      });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, "An adaptive plan could not be prepared."));
+      return response.json();
+    },
+  });
+  const approveAdaptive = useMutation({
+    mutationFn: async (proposalId: string) => {
+      const response = await apiFetch(apiUrl(`/api/v1/plan/adaptive/${proposalId}/approve`), { method: "POST" });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, "The proposed plan could not be approved."));
+      return response.json();
+    },
+    onSuccess: async () => {
+      setNotice("Adaptive plan approved.");
+      adaptive.reset();
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["plan"] }), queryClient.invalidateQueries({ queryKey: ["today"] })]);
+    },
+  });
+  const retryCalendar = useMutation({
+    mutationFn: async () => {
+      const response = await apiFetch(apiUrl("/api/v1/calendar/sync"), { method: "POST" });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, "Calendar sync is unavailable."));
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plan"] }),
+  });
 
   return (
     <AppShell>
@@ -114,7 +153,13 @@ export default function Plan() {
         title="Make the work fit the time"
         description="Calendar events, focus blocks, unscheduled commitments, capacity, and buffers in one view."
         action={
-          <button
+          <div className="flex flex-wrap gap-2"><button
+            className="button-secondary"
+            disabled={adaptive.isPending || !query.data?.unscheduled_commitments.length}
+            onClick={() => adaptive.mutate()}
+          >
+            {adaptive.isPending ? "Diagnosing…" : "Suggest adaptive plan"}
+          </button><button
             className="button-secondary"
             onClick={() => {
               setShowForm(true);
@@ -123,7 +168,7 @@ export default function Plan() {
           >
             <Plus className="mr-2 h-4 w-4" />
             Add plan block
-          </button>
+          </button></div>
         }
       />
       <div className="mb-5 flex flex-wrap items-end gap-3">
@@ -229,6 +274,21 @@ export default function Plan() {
           </form>
         </Surface>
       )}
+      {adaptive.isError && <p role="alert" className="mb-5 text-sm text-danger">{adaptive.error.message}</p>}
+      {approveAdaptive.isError && <p role="alert" className="mb-5 text-sm text-danger">{approveAdaptive.error.message}</p>}
+      {adaptive.data && (
+        <div className="mb-5 space-y-4">
+          <WhyThisPlan explanation={adaptive.data.explanation} />
+          <Surface className="p-5">
+            <h2 className="font-semibold">{adaptive.data.recommended_plan.label}</h2>
+            <p className="mt-2 text-sm text-muted">{adaptive.data.recommended_plan.summary}</p>
+            <ul className="mt-3 space-y-2 text-sm">
+              {adaptive.data.recommended_plan.blocks.map((block) => <li key={`${block.commitment_id}-${block.start_at}`} className="rounded-lg bg-surface-subtle p-3">{new Date(block.start_at).toLocaleString([], { timeZone: query.data?.timezone })} · {block.duration_minutes} min · {block.rationale}</li>)}
+            </ul>
+            <button className="button-primary mt-4" disabled={approveAdaptive.isPending} onClick={() => approveAdaptive.mutate(adaptive.data!.proposal_id)}>{approveAdaptive.isPending ? "Approving…" : "Approve this plan"}</button>
+          </Surface>
+        </div>
+      )}
       {query.isPending ? (
         <LoadingState label="Loading the plan" />
       ) : query.isError ? (
@@ -316,13 +376,14 @@ export default function Plan() {
                     <dd>{query.data.capacity.buffer_minutes} min</dd>
                   </div>
                 </dl>
-                {query.data.capacity.calendar_state !== "connected" && (
-                  <p className="mt-3 rounded-lg bg-accent-soft p-3 text-xs text-accent-strong">
-                    Profile-only planning · calendar{" "}
-                    {query.data.capacity.calendar_state.replaceAll("_", " ")} ·{" "}
-                    {query.data.capacity.confidence} confidence
-                  </p>
+                <p className="mt-3 rounded-lg bg-accent-soft p-3 text-xs text-accent-strong">
+                  {calendarCapacityLabel(query.data.capacity.calendar_state)} · {query.data.capacity.confidence} confidence
+                  {query.data.capacity.last_successful_sync && <> · synced {new Date(query.data.capacity.last_successful_sync).toLocaleString()}</>}
+                </p>
+                {query.data.capacity.retry_available && (
+                  <button className="button-secondary mt-3" disabled={retryCalendar.isPending} onClick={() => retryCalendar.mutate()}>{retryCalendar.isPending ? "Retrying…" : "Retry calendar"}</button>
                 )}
+                {retryCalendar.isError && <p role="alert" className="mt-2 text-xs text-danger">{retryCalendar.error.message}</p>}
               </Surface>
               <Surface className="p-5">
                 <h2 className="font-semibold">Unscheduled work</h2>
@@ -343,6 +404,7 @@ export default function Plan() {
                   </p>
                 )}
               </Surface>
+              {query.data.explanation && <WhyThisPlan explanation={query.data.explanation} />}
               <Surface className="p-5">
                 <h2 className="font-semibold">Buffer guidance</h2>
                 <p className="mt-2 text-sm text-muted">

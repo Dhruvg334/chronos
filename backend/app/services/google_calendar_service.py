@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 from googleapiclient.discovery import build
@@ -19,15 +19,17 @@ def sync_calendar_events(user_id: str, days_ahead: int = 14) -> bool:
         return False
         
     try:
-        service = build("calendar", "v3", credentials=creds)
+        service = build("calendar", "v3", credentials=creds, cache_discovery=False)
         
         now = datetime.now(timezone.utc)
         time_min = now.isoformat()
+        time_max = (now + timedelta(days=max(1, min(days_ahead, 90)))).isoformat()
         
         # Get primary calendar events
         events_result = service.events().list(
             calendarId="primary",
             timeMin=time_min,
+            timeMax=time_max,
             maxResults=100,
             singleEvents=True,
             orderBy="startTime"
@@ -52,15 +54,7 @@ def sync_calendar_events(user_id: str, days_ahead: int = 14) -> bool:
                 "is_chronos_created": False
             }
             
-            # Upsert using compound key (requires supabase match or handling)
-            # Supabase doesn't natively support ON CONFLICT easily via postgrest without a specific RPC
-            # We'll check if it exists first
-            res = supabase_client.table("calendar_events").select("id").eq("user_id", user_id).eq("google_event_id", event["id"]).execute()
-            
-            if res.data:
-                supabase_client.table("calendar_events").update(payload).eq("id", res.data[0]["id"]).execute()
-            else:
-                supabase_client.table("calendar_events").insert(payload).execute()
+            supabase_client.table("calendar_events").upsert(payload, on_conflict="user_id,google_event_id").execute()
                 
         # Update last_synced_at
         supabase_client.table("google_connections").update({
@@ -68,8 +62,8 @@ def sync_calendar_events(user_id: str, days_ahead: int = 14) -> bool:
         }).eq("user_id", user_id).execute()
         
         return True
-    except Exception as e:
-        logger.error(f"Failed to sync calendar for user {user_id}: {e}")
+    except Exception as exc:
+        logger.warning("Google Calendar sync failed safely: %s", exc.__class__.__name__)
         return False
 
 def get_free_busy(user_id: str, time_min: datetime, time_max: datetime) -> Optional[List[Dict[str, str]]]:
@@ -77,12 +71,14 @@ def get_free_busy(user_id: str, time_min: datetime, time_max: datetime) -> Optio
     Query Google Calendar freeBusy endpoint.
     Returns a list of busy periods: [{"start": "...", "end": "..."}]
     """
+    if time_max <= time_min:
+        return None
     creds = get_valid_credentials(user_id)
     if not creds:
         return None
         
     try:
-        service = build("calendar", "v3", credentials=creds)
+        service = build("calendar", "v3", credentials=creds, cache_discovery=False)
         
         body = {
             "timeMin": time_min.isoformat(),
@@ -96,6 +92,6 @@ def get_free_busy(user_id: str, time_min: datetime, time_max: datetime) -> Optio
         busy = primary.get("busy", [])
         
         return busy
-    except Exception as e:
-        logger.error(f"Failed to fetch free/busy for user {user_id}: {e}")
+    except Exception as exc:
+        logger.warning("Google Calendar free/busy failed safely: %s", exc.__class__.__name__)
         return None

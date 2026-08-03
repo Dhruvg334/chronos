@@ -142,6 +142,43 @@ def test_live_core_journey_transactions_and_rollback(live):
         alpha.table("commitments").select("*").execute()
 
 
+def test_adaptive_plan_approval_is_atomic_idempotent_and_owned(live):
+    admin, alpha, beta, alpha_id, beta_id = live
+    alpha.auth.sign_in_with_password({"email": ALPHA, "password": PASSWORD})
+    repositories = create_repository_set(admin)
+    commitment = repositories.commitments.create(alpha_id, _commitment(alpha_id, "Adaptive transaction"))
+    run_id = repositories.traces.create_run(alpha_id, "adaptive_planning", {}, workflow_id=str(uuid.uuid4()))
+    start = (datetime.now(timezone.utc) + timedelta(days=3)).replace(hour=9, minute=0, second=0, microsecond=0)
+
+    def proposal(blocks):
+        return repositories.planning.create_proposal(alpha_id, {
+            "id": str(uuid.uuid4()), "agent_run_id": run_id, "action_type": "commitment_reschedule", "status": "pending",
+            "payload_json": {"adaptive_plan": {"label": "Live adaptive plan", "summary": "Validated blocks", "blocks": blocks, "deferred_commitment_ids": [], "feasibility": "valid"}, "requires_approval": True},
+            "explanation": "Pending explicit approval.",
+        })
+
+    first = proposal([{"commitment_id": commitment["id"], "start_at": start.isoformat(), "duration_minutes": 30, "rationale": "Live transaction check"}])
+    key = f"adaptive-{uuid.uuid4()}"
+    block_id = str(uuid.uuid4())
+    result = alpha.rpc("approve_adaptive_plan_transaction", {"p_user_id": alpha_id, "p_proposal_id": first["id"], "p_idempotency_key": key, "p_block_ids": [block_id]}).execute().data
+    assert result["status"] == "approved" and result["idempotent_replay"] is False
+    replay = alpha.rpc("approve_adaptive_plan_transaction", {"p_user_id": alpha_id, "p_proposal_id": first["id"], "p_idempotency_key": key, "p_block_ids": [block_id]}).execute().data
+    assert replay["idempotent_replay"] is True
+
+    conflict_start = start + timedelta(hours=2)
+    rollback = proposal([
+        {"commitment_id": commitment["id"], "start_at": conflict_start.isoformat(), "duration_minutes": 30, "rationale": "First insert must roll back"},
+        {"commitment_id": commitment["id"], "start_at": (conflict_start + timedelta(minutes=10)).isoformat(), "duration_minutes": 30, "rationale": "Conflicts with first"},
+    ])
+    rollback_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+    failed = alpha.rpc("approve_adaptive_plan_transaction", {"p_user_id": alpha_id, "p_proposal_id": rollback["id"], "p_idempotency_key": f"adaptive-{uuid.uuid4()}", "p_block_ids": rollback_ids}).execute().data
+    assert failed["status"] == "failed"
+    assert admin.table("focus_blocks").select("id").in_("id", rollback_ids).execute().data == []
+    assert repositories.planning.get_proposal(alpha_id, rollback["id"])["status"] == "pending"
+    with pytest.raises(Exception):
+        beta.rpc("approve_adaptive_plan_transaction", {"p_user_id": beta_id, "p_proposal_id": rollback["id"], "p_idempotency_key": f"adaptive-{uuid.uuid4()}", "p_block_ids": rollback_ids}).execute()
+
+
 def test_rls_prevents_cross_user_reads_writes_and_approval(live):
     admin, _, beta, alpha_id, beta_id = live
     repositories = create_repository_set(admin)

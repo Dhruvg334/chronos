@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import copy
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from app.repositories.protocols import RepositorySet
@@ -102,6 +102,24 @@ class MemoryPlanning:
             self.proposals[:], self.focus.rows[:] = snapshot
             raise
         result = {"status": "approved", "action": payload.get("rescue_action_type"), "focus_block": created, "idempotent_replay": False}
+        self.approvals[idempotency_key] = result; return result
+    def approve_adaptive_plan(self, user_id, proposal_id, idempotency_key, block_ids):
+        if idempotency_key in self.approvals: return {**self.approvals[idempotency_key], "idempotent_replay": True}
+        snapshot = copy.deepcopy((self.proposals, self.focus.rows))
+        try:
+            proposal = self.get_proposal(user_id, proposal_id)
+            if not proposal or proposal.get("status") != "pending": raise RuntimeError("not found")
+            blocks = proposal["payload_json"]["adaptive_plan"]["blocks"]
+            if len(blocks) != len(block_ids): raise RuntimeError("invalid block ids")
+            for block, block_id in zip(blocks, block_ids):
+                start = datetime.fromisoformat(str(block["start_at"]).replace("Z", "+00:00"))
+                end = start + timedelta(minutes=block["duration_minutes"])
+                self.focus.create(user_id, {"id": block_id, "commitment_id": block["commitment_id"], "title": block.get("rationale", "Planned focus"), "start_at": start.isoformat(), "end_at": end.isoformat(), "block_type": "deep_work", "status": "scheduled"})
+            proposal["status"] = "approved"
+        except Exception:
+            self.proposals[:], self.focus.rows[:] = snapshot
+            raise
+        result = {"status": "approved", "block_ids": block_ids, "idempotent_replay": False}
         self.approvals[idempotency_key] = result; return result
     def list_pending(self, user_id): return [row for row in self.proposals if row.get("user_id", user_id) == user_id and row.get("status") == "pending"]
     def list_calendar_events(self, user_id, start_at, end_at):

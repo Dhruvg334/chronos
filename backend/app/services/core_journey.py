@@ -118,10 +118,27 @@ class CoreJourneyService:
     def _profile(self, user_id: str) -> PlanningProfile:
         return PlanningProfile.model_validate(self.repositories.planning_profiles.get(user_id))
 
-    def _calendar_state(self, user_id: str) -> str:
+    def _calendar_context(self, user_id: str, events: list[dict[str, Any]]) -> tuple[str, str | None]:
         if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
-            return "configuration_missing"
-        return str(self.repositories.google_connections.get_status(user_id).get("state") or "unavailable")
+            return "configuration_missing", None
+        status = self.repositories.google_connections.get_status(user_id)
+        raw_state = str(status.get("state") or "unavailable")
+        last_sync = status.get("last_successful_sync")
+        if raw_state == "unavailable":
+            return "unavailable", last_sync
+        if raw_state != "connected":
+            return "disconnected", None
+        if not last_sync:
+            return ("cached" if events else "unavailable"), None
+        try:
+            age = datetime.now(timezone.utc) - parse_datetime(last_sync)
+        except (TypeError, ValueError):
+            return "stale", str(last_sync)
+        if age <= timedelta(minutes=5):
+            return "live", str(last_sync)
+        if age <= timedelta(hours=24):
+            return "cached", str(last_sync)
+        return "stale", str(last_sync)
 
     @staticmethod
     def _capacity_view(result: CapacityResult) -> CapacityView:
@@ -138,6 +155,8 @@ class CoreJourneyService:
             confidence=result.confidence,
             sources=result.sources,
             calendar_state=result.calendar_state,
+            last_successful_sync=result.last_successful_sync,
+            retry_available=result.retry_available,
         )
 
     def strategy_context(self, user_id: str, ranked: list[dict[str, Any]], blocks: list[dict[str, Any]], events: list[dict[str, Any]], active: dict[str, Any] | None, capacity: CapacityResult, profile: PlanningProfile) -> StrategyContext:
@@ -183,7 +202,11 @@ class CoreJourneyService:
         events = self.repositories.planning.list_calendar_events(user_id, day_start, day_end)
         pending = self.repositories.planning.list_pending(user_id)
         active = self.repositories.focus.get_active(user_id)
-        capacity = self.capacity_engine.calculate_day(local_current.date(), profile, calendar_events=events, plan_blocks=blocks, calendar_state=self._calendar_state(user_id))
+        calendar_state, last_sync = self._calendar_context(user_id, events)
+        usable_events = [row for row in events if row.get("source") != "google"]
+        if calendar_state in {"live", "cached", "stale", "unavailable"}:
+            usable_events.extend(row for row in events if row.get("source") == "google")
+        capacity = self.capacity_engine.calculate_day(local_current.date(), profile, calendar_events=usable_events, plan_blocks=blocks, calendar_state=calendar_state, last_successful_sync=last_sync)
 
         next_action = None
         if ranked:
@@ -219,6 +242,14 @@ class CoreJourneyService:
             pending_approval_count=len(pending),
             active_focus_session=focus_view(active, now=current) if active else None,
             recovery=recovery,
+            explanation={
+                "constraints_considered": ["risk", "deadline", "importance", "calendar", "available capacity"],
+                "next_action_reason": "The next action is the highest-ranked executable commitment after deterministic checks." if next_action else "No executable commitment is available.",
+                "deferred": [row["title"] for row in ranked[1:4]],
+                "changed": "Loading Today did not change the plan.",
+                "ai_used": False,
+                "requires_approval": True,
+            },
         )
 
     def plan(self, user_id: str, start_at: datetime, end_at: datetime) -> PlanResponse:
@@ -230,12 +261,17 @@ class CoreJourneyService:
         event_views = [PlanItemView(id=str(row["id"]), kind="calendar_event", title=str(row["title"]), start_at=parse_datetime(row["start_at"]), end_at=parse_datetime(row["end_at"]), status="busy") for row in events]
         block_views = [PlanItemView(id=str(row["id"]), kind="focus_block", title=str(row["title"]), start_at=parse_datetime(row["start_at"]), end_at=parse_datetime(row["end_at"]), commitment_id=str(row["commitment_id"]) if row.get("commitment_id") else None, status=str(row.get("status") or "scheduled")) for row in blocks]
         unscheduled = [PlanItemView(id=str(row["id"]), kind="commitment", title=str(row["title"]), commitment_id=str(row["id"]), status=str(row.get("risk_level") or "active")) for row in commitments if str(row["id"]) not in scheduled_ids]
+        calendar_state, last_sync = self._calendar_context(user_id, events)
+        usable_events = [row for row in events if row.get("source") != "google"]
+        if calendar_state in {"live", "cached", "stale", "unavailable"}:
+            usable_events.extend(row for row in events if row.get("source") == "google")
         capacity = self.capacity_engine.calculate_day(
             start_at.astimezone(ZoneInfo(profile.timezone)).date(),
             profile,
-            calendar_events=events,
+            calendar_events=usable_events,
             plan_blocks=blocks,
-            calendar_state=self._calendar_state(user_id),
+            calendar_state=calendar_state,
+            last_successful_sync=last_sync,
         )
         timeline = sorted([*event_views, *block_views], key=lambda row: row.start_at or end_at)
         return PlanResponse(
@@ -248,6 +284,14 @@ class CoreJourneyService:
             ordered_timeline=timeline,
             capacity=self._capacity_view(capacity),
             buffer_guidance=f"Keep at least {profile.minimum_transition_buffer_minutes} minutes between blocks and {profile.minimum_daily_unscheduled_buffer_minutes} minutes unscheduled each day.",
+            explanation={
+                "constraints_considered": ["personal availability", "calendar", "transition buffer", "daily focus limit"],
+                "next_action_reason": "Commitments are ordered by risk, deadline, importance, and stable identifier.",
+                "deferred": [item.title for item in unscheduled[1:4]],
+                "changed": "No plan changes were made while loading this view.",
+                "ai_used": False,
+                "requires_approval": True,
+            },
         )
 
     def create_plan_block(self, user_id: str, commitment_id: str, start_at: datetime, duration: int, title: str | None, block_type: str) -> dict[str, Any]:

@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 from app.main import app
+from app.api.dependencies import get_repositories
+from tests.fakes import MemoryPlanning, repositories
 import pytest
 
 client = TestClient(app)
@@ -18,11 +20,8 @@ def test_sync_calendar_failure(mock_sync):
     response = client.post("/api/v1/calendar/sync", headers={"Authorization": "Bearer mock_token"})
     assert response.status_code == 500
 
-@patch("app.api.v1.calendar.supabase_client")
-def test_get_events(mock_supabase):
-    mock_execute = mock_supabase.table.return_value.select.return_value.eq.return_value.gte.return_value.order.return_value.execute
-    mock_execute.return_value.data = [{"id": "1", "title": "Test Event"}]
-    
+def test_get_events():
+    app.dependency_overrides[get_repositories] = lambda: repositories(planning=MemoryPlanning(events=[{"id": "1", "title": "Test Event", "user_id": "00000000-0000-0000-0000-000000000001", "start_at": "2026-08-03T10:00:00Z", "end_at": "2099-08-03T11:00:00Z"}]))
     response = client.get("/api/v1/calendar/events", headers={"Authorization": "Bearer mock_token"})
     assert response.status_code == 200
     assert len(response.json()["events"]) == 1

@@ -1,0 +1,7 @@
+[
+  {"input":"Finish the report.","source_text":"Finish the report","expected_preserved":true},
+  {"input":"Prepare slides.","source_text":"Client requires twenty slides","expected_preserved":false},
+  {"input":"Wait for screenshots.","source_text":"Wait for screenshots","expected_preserved":true},
+  {"input":"Call at four.","source_text":"Call at five","expected_preserved":false},
+  {"input":"Submit Tuesday morning.","source_text":"Submit Tuesday morning","expected_preserved":true}
+]

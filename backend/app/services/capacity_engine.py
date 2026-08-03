@@ -22,6 +22,8 @@ class CapacityResult:
     confidence: str
     sources: tuple[str, ...]
     calendar_state: str
+    last_successful_sync: str | None = None
+    retry_available: bool = False
 
     def model_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -70,13 +72,23 @@ class CapacityEngine:
         calendar_events: list[dict[str, Any]],
         plan_blocks: list[dict[str, Any]],
         calendar_state: str = "disconnected",
+        last_successful_sync: str | None = None,
         window_start: datetime | None = None,
         window_end: datetime | None = None,
     ) -> CapacityResult:
         sources = ["personal_availability"]
         confidence = "high"
-        if calendar_state == "connected":
-            sources.append("calendar_events")
+        if calendar_state in {"connected", "live"}:
+            sources.append("live_calendar")
+        elif calendar_state == "cached":
+            sources.append("cached_calendar")
+            confidence = "medium"
+        elif calendar_state == "stale":
+            sources.append("stale_calendar")
+            confidence = "low"
+        elif calendar_state == "unavailable" and calendar_events:
+            sources.append("cached_calendar_provider_unavailable")
+            confidence = "low"
         elif calendar_state == "unavailable":
             sources.append("calendar_unavailable_profile_only")
             confidence = "low"
@@ -88,7 +100,7 @@ class CapacityEngine:
             confidence = "medium"
 
         if day.weekday() not in profile.available_weekdays:
-            return CapacityResult(0, 0, 0, 0, 0, 0, 0, confidence, tuple(sources), calendar_state)
+            return CapacityResult(0, 0, 0, 0, 0, 0, 0, confidence, tuple(sources), calendar_state, last_successful_sync, calendar_state in {"stale", "unavailable"})
 
         zone = ZoneInfo(profile.timezone)
         work_start = datetime.combine(day, profile.working_start_time, zone)
@@ -98,7 +110,7 @@ class CapacityEngine:
         if window_end is not None:
             work_end = min(work_end, window_end.astimezone(zone))
         if work_end <= work_start:
-            return CapacityResult(0, 0, 0, 0, 0, 0, 0, confidence, tuple(sources), calendar_state)
+            return CapacityResult(0, 0, 0, 0, 0, 0, 0, confidence, tuple(sources), calendar_state, last_successful_sync, calendar_state in {"stale", "unavailable"})
         work_minutes = int((work_end - work_start).total_seconds() // 60)
 
         protected: list[Interval] = []
@@ -138,6 +150,8 @@ class CapacityEngine:
             confidence,
             tuple(sources),
             calendar_state,
+            last_successful_sync,
+            calendar_state in {"stale", "unavailable"},
         )
 
     def calculate_until(
@@ -149,6 +163,7 @@ class CapacityEngine:
         calendar_events: list[dict[str, Any]],
         plan_blocks: list[dict[str, Any]],
         calendar_state: str = "disconnected",
+        last_successful_sync: str | None = None,
     ) -> CapacityResult:
         zone = ZoneInfo(profile.timezone)
         cursor = start.astimezone(zone).date()
@@ -157,13 +172,13 @@ class CapacityEngine:
         while cursor <= final_day:
             results.append(self.calculate_day(
                 cursor, profile, calendar_events=calendar_events, plan_blocks=plan_blocks,
-                calendar_state=calendar_state,
+                calendar_state=calendar_state, last_successful_sync=last_successful_sync,
                 window_start=start if cursor == start.astimezone(zone).date() else None,
                 window_end=deadline if cursor == final_day else None,
             ))
             cursor += timedelta(days=1)
         if not results:
-            return self.calculate_day(start.astimezone(zone).date(), profile, calendar_events=[], plan_blocks=[], calendar_state=calendar_state)
+            return self.calculate_day(start.astimezone(zone).date(), profile, calendar_events=[], plan_blocks=[], calendar_state=calendar_state, last_successful_sync=last_successful_sync)
         return CapacityResult(
             sum(item.total_available_minutes for item in results),
             sum(item.scheduled_minutes for item in results),
@@ -175,4 +190,6 @@ class CapacityEngine:
             min((item.confidence for item in results), key={"low": 0, "medium": 1, "high": 2}.get),
             results[0].sources,
             calendar_state,
+            last_successful_sync,
+            calendar_state in {"stale", "unavailable"},
         )

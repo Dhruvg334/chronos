@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import FocusPanel from '../components/focus/FocusPanel';
 import AppShell from '../components/layout/AppShell';
 import { StrategyRecommendationCard } from '../components/strategy/StrategyRecommendationCard';
+import { WhyThisPlan } from '../components/planning/WhyThisPlan';
 import { EmptyState, ErrorState, LoadingState, PageHeader, Surface } from '../components/ui/primitives';
 import { apiFetch, apiUrl, getApiErrorMessage } from '../lib/api';
 import type { TodayResponse } from '../types/api';
@@ -22,6 +23,7 @@ export default function Today() {
       <FocusPanel session={data.active_focus_session} nextAction={data.next_action} />
       <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]"><Surface className="p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-semibold">Ordered plan</h2><Link className="text-sm font-medium text-accent-strong hover:underline" to="/plan">Open Plan</Link></div><ol className="space-y-1">{data.ordered_plan.map((item, index) => <li key={item.id} className="flex items-center gap-4 rounded-xl px-3 py-3 hover:bg-surface-subtle"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-strong">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate font-medium">{item.title}</p><p className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-muted"><Clock3 className="h-3.5 w-3.5" />{item.status.replaceAll('_', ' ')}</p></div></li>)}</ol></Surface><Surface className="p-5 sm:p-6"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Attention</p><p className="mt-3 text-3xl font-semibold">{data.attention_count}</p><p className="mt-1 text-sm text-muted">items may need a decision.</p><p className="mt-4 text-sm text-muted">{data.pending_approval_count} approvals waiting</p></Surface></div>
       {data.strategy_recommendation && <StrategyRecommendationCard recommendation={data.strategy_recommendation} />}
+      {data.explanation && <WhyThisPlan explanation={data.explanation} />}
       {data.recovery && <Surface className="p-5 sm:p-6"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-danger">Recovery</p><h2 className="mt-1 text-lg font-semibold">{data.recovery.title}</h2><p className="mt-2 text-sm text-muted">{data.recovery.reason}</p><ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">{data.recovery.options.map(option => <li key={option}>{option}</li>)}</ul><button className="button-secondary mt-4" disabled={recovery.isPending} onClick={() => recovery.mutate(data.recovery!.commitment_id)}>{recovery.isPending ? 'Preparing…' : 'Prepare recovery recommendation'}</button>{recovery.isSuccess && <p role="status" className="mt-3 text-sm text-success">Recommendation prepared for approval. No plan data changed.</p>}{recovery.isError && <p role="alert" className="mt-3 text-sm text-danger">{recovery.error.message}</p>}</Surface>}
     </div>}
   </AppShell>;

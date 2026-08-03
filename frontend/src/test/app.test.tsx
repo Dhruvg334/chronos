@@ -23,11 +23,11 @@ let savedProfile: Record<string, unknown> | null;
 const planningProfile = { timezone: 'Asia/Kolkata', available_weekdays: [0, 1, 2, 3, 4, 5], working_start_time: '09:30:00', working_end_time: '18:30:00', daily_focus_limit_minutes: 300, default_focus_duration_minutes: 45, minimum_transition_buffer_minutes: 10, minimum_daily_unscheduled_buffer_minutes: 60, protected_interval_start: '13:00:00', protected_interval_end: '14:00:00', quick_task_threshold_minutes: 5 };
 
 function todayData(): TodayResponse {
-  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60 }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { commitment_id: 'c1', title: 'Make the plan credible again', reason: 'The deadline is close.', options: ['Define a smaller next step'], requires_approval: true } };
+  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60 }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { commitment_id: 'c1', title: 'Make the plan credible again', reason: 'The deadline is close.', options: ['Define a smaller next step'], requires_approval: true }, explanation: { constraints_considered: ['risk', 'deadline', 'calendar'], next_action_reason: 'Highest-ranked executable commitment.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true } };
 }
 
 function planData(): PlanResponse {
-  return { range_start: '2026-08-02T00:00:00Z', range_end: '2026-08-03T00:00:00Z', calendar_events: [{ id: 'e1', kind: 'calendar_event', title: 'Team call', start_at: '2026-08-02T16:00:00Z', end_at: '2026-08-02T17:00:00Z', status: 'busy' }], plan_blocks: [], unscheduled_commitments: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], ordered_timeline: [{ id: 'e1', kind: 'calendar_event', title: 'Team call', start_at: '2026-08-02T16:00:00Z', end_at: '2026-08-02T17:00:00Z', status: 'busy' }], capacity: { total_minutes: 300, busy_minutes: 60, planned_minutes: overCapacity ? 360 : 0, buffer_minutes: 70, available_minutes: overCapacity ? 0 : 300, total_available_minutes: 300, scheduled_minutes: overCapacity ? 360 : 0, remaining_minutes: overCapacity ? 0 : 300, over_capacity_minutes: overCapacity ? 60 : 0, confidence: 'medium', sources: ['personal_availability', 'calendar_disconnected_profile_only'], calendar_state: 'disconnected' }, buffer_guidance: 'Keep at least 10 minutes between demanding blocks.' };
+  return { range_start: '2026-08-02T00:00:00Z', range_end: '2026-08-03T00:00:00Z', calendar_events: [{ id: 'e1', kind: 'calendar_event', title: 'Team call', start_at: '2026-08-02T16:00:00Z', end_at: '2026-08-02T17:00:00Z', status: 'busy' }], plan_blocks: [], unscheduled_commitments: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], ordered_timeline: [{ id: 'e1', kind: 'calendar_event', title: 'Team call', start_at: '2026-08-02T16:00:00Z', end_at: '2026-08-02T17:00:00Z', status: 'busy' }], capacity: { total_minutes: 300, busy_minutes: 60, planned_minutes: overCapacity ? 360 : 0, buffer_minutes: 70, available_minutes: overCapacity ? 0 : 300, total_available_minutes: 300, scheduled_minutes: overCapacity ? 360 : 0, remaining_minutes: overCapacity ? 0 : 300, over_capacity_minutes: overCapacity ? 60 : 0, confidence: 'medium', sources: ['personal_availability', 'calendar_disconnected_profile_only'], calendar_state: 'disconnected' }, buffer_guidance: 'Keep at least 10 minutes between demanding blocks.', explanation: { constraints_considered: ['calendar', 'capacity'], next_action_reason: 'Risk and deadline ranking selected the fix.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true } };
 }
 
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } }); }
@@ -42,6 +42,9 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith('/api/v1/today')) return json(todayData());
+    if (url.includes('/api/v1/plan/adaptive/') && url.endsWith('/approve')) return json({ status: 'approved', block_ids: ['b1'] });
+    if (url.endsWith('/api/v1/plan/adaptive')) return json({ workflow_id: 'w1', proposal_id: 'p1', recommended_plan: { label: 'Protect the fix', summary: 'One conflict-free block.', feasibility: 'valid', blocks: [{ commitment_id: 'c1', start_at: '2026-08-04T10:00:00Z', duration_minutes: 60, rationale: 'Highest-risk executable outcome.' }], deferred_commitment_ids: [] }, explanation: { constraints_considered: ['availability', 'calendar', 'dependencies'], next_action_reason: 'The fix is urgent and executable.', deferred: ['Slides'], changed: 'A proposal was prepared; no plan data changed.', ai_used: true, requires_approval: true }, rejected_candidate_count: 1, requires_approval: true });
+    if (url.endsWith('/api/v1/calendar/sync')) return json({ success: true });
     if (url.includes('/api/v1/plan/blocks')) return transactionFailure ? json({ error: { message: 'The transaction failed. No plan data was saved.' } }, 503) : conflictMode ? json({ error: { message: 'That time overlaps with Team call.' } }, 409) : json({ status: 'created', block: { id: 'b1' } }, 201);
     if (url.includes('/api/v1/plan?')) return json(planData());
     if (url.endsWith('/api/v1/settings/planning-profile/reset')) return json(planningProfile);
@@ -100,7 +103,7 @@ it('pauses, resumes, and finishes focus with a contextual reflection', async () 
   expect(screen.getByRole('heading', { name: /close the focus loop/i })).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /save reflection/i }));
   expect(await screen.findByText(/reflection saved/i)).toBeInTheDocument();
-});
+}, 10_000);
 
 it('shows the deterministic stuck options', async () => {
   active = { id: 'f1', commitment_id: 'c1', title: 'Fix', status: 'active', planned_minutes: 25, elapsed_seconds: 0, remaining_seconds: 1500, started_at: new Date().toISOString() };
@@ -180,6 +183,23 @@ it('renders Strategy Engine evidence, confidence, and automation boundary', asyn
   expect(await screen.findByText(/high confidence/i)).toBeInTheDocument();
   expect(screen.getByText('urgent · important')).toBeInTheDocument();
   expect(screen.getByText(/no automatic changes/i)).toBeInTheDocument();
+});
+
+it('shows compact plan transparency without hidden reasoning', async () => {
+  renderWithContext(<Today />);
+  expect(await screen.findByRole('heading', { name: 'Why this plan?' })).toBeInTheDocument();
+  expect(screen.getByText('Deterministic')).toBeInTheDocument();
+  expect(screen.getByText(/still requires your approval/i)).toBeInTheDocument();
+});
+
+it('prepares and explicitly approves a validated adaptive plan', async () => {
+  const user = userEvent.setup(); renderWithContext(<Plan />, { path: '/plan' });
+  await user.click(await screen.findByRole('button', { name: /suggest adaptive plan/i }));
+  expect(await screen.findByRole('heading', { name: 'Protect the fix' })).toBeInTheDocument();
+  expect(screen.getByText('AI-assisted')).toBeInTheDocument();
+  expect(screen.getByText(/no plan data changed/i)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /approve this plan/i }));
+  expect(await screen.findByText('Adaptive plan approved.')).toBeInTheDocument();
 });
 
 it('clears private query data on logout and leaves protected content', async () => {

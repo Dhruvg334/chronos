@@ -12,6 +12,8 @@ Inbox begins with one plain-language input. Extraction preserves uncertainty, pr
 
 Plan combines cached calendar events, plan blocks, unscheduled commitments, personal availability, remaining/over-capacity minutes, and buffer guidance. It labels profile-only planning and calendar confidence honestly. Working-window, protected-time, transition, overlap, and capacity errors remain visible and actionable.
 
+Calendar labels distinguish live, cached, stale, unavailable, and profile-only planning. Stale and unavailable states expose a retry action without blocking profile-driven planning.
+
 Settings makes timezone, available days, working hours, focus limits, default focus duration, transition and daily reserves, optional protected time, and quick-task threshold editable and resettable. Calendar state distinguishes connected, disconnected, unavailable, and configuration missing without exposing provider errors.
 
 ## Keep execution contextual
@@ -21,6 +23,8 @@ Focus opens from Today and exposes duration, elapsed/remaining time, pause, resu
 ## Explain consequences
 
 Strategy and recovery recommendations state why they apply, evidence, confidence, action, trade-off, and that no automatic change occurs. Plan mutation waits for explicit approval.
+
+“Why this plan?” shows constraints, selection summary, deferred work, whether AI assisted, and the approval boundary. It never exposes raw prompts, internal trace payloads, or hidden reasoning. Adaptive planning shows one validated recommendation even when the model proposed several candidates.
 
 ## Visual foundation
 

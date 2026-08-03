@@ -44,16 +44,16 @@ def test_approve_success_persists_only_reviewed_drafts():
 
 
 def test_manual_capture_keeps_commitments_separate_and_uncertainty_visible():
-    text = "I need to finish the authentication regression fix before tomorrow afternoon, prepare slides for Monday, attend a team call at 4 PM, and submit my database assignment by Tuesday morning. The auth fix needs about an hour, but I am unsure how long the slides will take."
+    text = "I need to finish the authentication regression fix before tomorrow afternoon, prepare slides for Monday, attend a team call at 4 PM, and submit my database assignment by Tuesday morning. The auth fix needs about an hour, but I am unsure how long the slides will take, and I am waiting for my teammate to send the screenshots."
     structured = IntakeResponse.model_validate({
         "agent_run_id": str(uuid4()),
         "drafts": [
-            {"title": "Authentication regression fix", "type": "hard_deadline", "estimated_minutes": 60, "importance": 5, "flexibility": 1, "confidence_score": .9, "tasks": [], "missing_fields": []},
-            {"title": "Prepare slides", "type": "hard_deadline", "estimated_minutes": None, "importance": 4, "flexibility": 2, "confidence_score": .6, "tasks": [], "missing_fields": ["estimated_minutes"]},
-            {"title": "Team call", "type": "event", "estimated_minutes": None, "importance": 3, "flexibility": 1, "confidence_score": .9, "tasks": [], "missing_fields": ["duration"]},
-            {"title": "Database assignment", "type": "hard_deadline", "estimated_minutes": None, "importance": 4, "flexibility": 1, "confidence_score": .8, "tasks": [], "missing_fields": ["estimated_minutes"]},
+            {"title": "Authentication regression fix", "type": "hard_deadline", "kind": "task", "estimated_minutes": 60, "effort_confidence": "approximate", "deadline_precision": "ambiguous", "source_text": "authentication regression fix before tomorrow afternoon", "importance": 5, "flexibility": 1, "confidence_score": .9, "tasks": [], "missing_fields": []},
+            {"title": "Prepare slides", "type": "hard_deadline", "kind": "project_outcome", "estimated_minutes": None, "effort_confidence": "unknown", "dependencies": ["my teammate to send the screenshots"], "importance": 4, "flexibility": 2, "confidence_score": .6, "tasks": [], "missing_fields": ["estimated_minutes"]},
+            {"title": "Team call", "type": "event", "kind": "event", "estimated_minutes": None, "importance": 3, "flexibility": 1, "confidence_score": .9, "tasks": [], "missing_fields": ["duration"]},
+            {"title": "Database assignment", "type": "hard_deadline", "kind": "project_outcome", "estimated_minutes": None, "importance": 4, "flexibility": 1, "confidence_score": .8, "tasks": [], "missing_fields": ["estimated_minutes"]},
         ],
-        "questions": [{"question": "How long should the first slide-preparation block be?", "context": "The effort estimate is uncertain."}],
+        "questions": [{"question": "How long should the first slide-preparation block be?", "context": "The effort estimate is uncertain.", "field": "estimated_minutes"}],
     })
     gateway, traces = FakeModelGateway(structured=structured), MemoryTraces()
     app.dependency_overrides[get_model_gateway] = lambda: gateway
@@ -62,4 +62,7 @@ def test_manual_capture_keeps_commitments_separate_and_uncertainty_visible():
     assert response.status_code == 200
     assert [draft["title"] for draft in response.json()["drafts"]] == ["Authentication regression fix", "Prepare slides", "Team call", "Database assignment"]
     assert response.json()["drafts"][1]["missing_fields"] == ["estimated_minutes"]
+    assert response.json()["drafts"][1]["dependencies"] == ["my teammate to send the screenshots"]
+    assert response.json()["drafts"][2]["kind"] == "event"
+    assert response.json()["drafts"][0]["deadline_precision"] == "ambiguous"
     assert response.json()["questions"][0]["context"] == "The effort estimate is uncertain."

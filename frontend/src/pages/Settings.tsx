@@ -117,6 +117,24 @@ export default function Settings() {
       await queryClient.invalidateQueries();
     },
   });
+  const connectCalendar = useMutation({
+    mutationFn: async () => {
+      const response = await apiFetch(apiUrl("/api/v1/google/auth/url"));
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, "Google Calendar connection is unavailable."));
+      return response.json() as Promise<{ auth_url: string }>;
+    },
+    onSuccess: ({ auth_url }) => window.location.assign(auth_url),
+  });
+  const disconnectCalendar = useMutation({
+    mutationFn: async () => {
+      const response = await apiFetch(apiUrl("/api/v1/google/disconnect"), { method: "POST" });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, "Google Calendar could not be disconnected."));
+    },
+    onSuccess: async () => {
+      setNotice("Google Calendar disconnected.");
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["integration-status"] }), queryClient.invalidateQueries({ queryKey: ["plan"] }), queryClient.invalidateQueries({ queryKey: ["today"] })]);
+    },
+  });
 
   const setNumber = (key: keyof PlanningProfile, value: string) =>
     setForm((current) =>
@@ -172,6 +190,13 @@ export default function Settings() {
                     Retry status
                   </button>
                 )}
+                {item.state === "disconnected" && (
+                  <button className="button-primary mt-3" disabled={connectCalendar.isPending} onClick={() => connectCalendar.mutate()}>{connectCalendar.isPending ? "Opening…" : "Connect read-only calendar"}</button>
+                )}
+                {item.state === "connected" && (
+                  <button className="button-secondary mt-3" disabled={disconnectCalendar.isPending} onClick={() => disconnectCalendar.mutate()}>{disconnectCalendar.isPending ? "Disconnecting…" : "Disconnect calendar"}</button>
+                )}
+                {(connectCalendar.isError || disconnectCalendar.isError) && <p role="alert" className="mt-2 text-sm text-danger">{(connectCalendar.error || disconnectCalendar.error)?.message}</p>}
               </div>
             ))
           )}

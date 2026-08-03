@@ -5,6 +5,7 @@ export interface BrainDumpRequest {
 export interface ClarifyingQuestion {
   question: string;
   context?: string | null;
+  field: string;
 }
 
 export interface ExtractedTask {
@@ -30,6 +31,11 @@ export interface ExtractedCommitment {
   tasks: ExtractedTask[];
   missing_fields: string[];
   confidence_score: number;
+  kind?: 'event' | 'task' | 'routine' | 'project_outcome' | 'dependency';
+  source_text?: string | null;
+  deadline_precision?: 'exact' | 'window' | 'ambiguous' | 'none';
+  effort_confidence?: 'known' | 'approximate' | 'unknown';
+  dependencies?: string[];
 }
 
 export type CommitmentDraft = ExtractedCommitment;
@@ -210,6 +216,31 @@ export interface TodayResponse {
   pending_approval_count: number;
   active_focus_session: ActiveFocusSession | null;
   recovery: { commitment_id: string; title: string; reason: string; options: string[]; requires_approval: true } | null;
+  explanation?: PlanExplanation | null;
+}
+
+export interface PlanExplanation {
+  constraints_considered: string[];
+  next_action_reason: string;
+  deferred: string[];
+  changed: string;
+  ai_used: boolean;
+  requires_approval: boolean;
+}
+
+export interface AdaptivePlanResponse {
+  workflow_id: string;
+  proposal_id: string;
+  recommended_plan: {
+    label: string;
+    summary: string;
+    feasibility: 'valid';
+    blocks: Array<{ commitment_id: string; start_at: string; duration_minutes: number; rationale: string }>;
+    deferred_commitment_ids: string[];
+  };
+  explanation: PlanExplanation;
+  rejected_candidate_count: number;
+  requires_approval: true;
 }
 
 export interface PlanResponse {
@@ -220,8 +251,9 @@ export interface PlanResponse {
   plan_blocks: PlanItem[];
   unscheduled_commitments: PlanItem[];
   ordered_timeline: PlanItem[];
-  capacity: { total_minutes: number; busy_minutes: number; planned_minutes: number; buffer_minutes: number; available_minutes: number; total_available_minutes: number; scheduled_minutes: number; remaining_minutes: number; over_capacity_minutes: number; confidence: 'low' | 'medium' | 'high'; sources: string[]; calendar_state: string };
+  capacity: { total_minutes: number; busy_minutes: number; planned_minutes: number; buffer_minutes: number; available_minutes: number; total_available_minutes: number; scheduled_minutes: number; remaining_minutes: number; over_capacity_minutes: number; confidence: 'low' | 'medium' | 'high'; sources: string[]; calendar_state: string; last_successful_sync?: string | null; retry_available?: boolean };
   buffer_guidance: string;
+  explanation?: PlanExplanation | null;
 }
 
 export interface PlanningProfile {

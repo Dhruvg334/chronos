@@ -77,7 +77,13 @@ async def process_intake(
             trace_repository=repositories.traces,
         ),
     )
-    result, context = await workflow.extract(user_id=user_id, text=request.text, request_id=request_id_context.get())
+    profile = repositories.planning_profiles.get(user_id)
+    result, context = await workflow.extract(
+        user_id=user_id,
+        text=request.text,
+        timezone_name=str(profile.get("timezone") or "UTC"),
+        request_id=request_id_context.get(),
+    )
     result.agent_run_id = uuid.UUID(context.run_id or context.workflow_id)
     return result
 

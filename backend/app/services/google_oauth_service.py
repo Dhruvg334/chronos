@@ -77,7 +77,7 @@ def validate_oauth_state(state: str) -> str:
             raise ValueError("OAuth state missing user id")
         return str(user_id)
     except Exception as exc:
-        logger.warning("Rejected invalid Google OAuth state: %s", exc)
+        logger.warning("Rejected invalid Google OAuth state")
         raise ValueError("Invalid OAuth state") from exc
 
 
@@ -140,7 +140,7 @@ def exchange_code_for_token(code: str, state: str) -> None:
             "p_expires_at": creds.expiry.replace(tzinfo=timezone.utc).isoformat() if creds.expiry else None,
         }
         supabase_client.rpc("set_google_tokens", rpc_payload).execute()
-        logger.info("Successfully connected Google Calendar for user %s", user_id)
+        logger.info("Google Calendar connection stored successfully")
     except APIError as e:
         logger.error("Failed to save google connection metadata")
         raise ValueError("Database error saving connection") from e

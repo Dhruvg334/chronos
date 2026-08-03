@@ -82,6 +82,18 @@ def test_calendar_unavailable_degrades_with_low_confidence():
     assert result.calendar_state == "unavailable"
 
 
+def test_calendar_freshness_sources_are_explicit():
+    synced = "2026-08-03T08:55:00+00:00"
+    live = CapacityEngine().calculate_day(DAY, profile(), calendar_events=[row("10:00", "11:00", source="google")], plan_blocks=[], calendar_state="live", last_successful_sync=synced)
+    cached = calculate(events=[row("10:00", "11:00", source="google")], state="cached")
+    stale = calculate(events=[row("10:00", "11:00", source="google")], state="stale")
+    unavailable = calculate(events=[row("10:00", "11:00", source="google")], state="unavailable")
+    assert live.sources[-1] == "live_calendar" and live.last_successful_sync == synced
+    assert cached.sources[-1] == "cached_calendar" and cached.confidence == "medium"
+    assert stale.sources[-1] == "stale_calendar" and stale.retry_available is True
+    assert unavailable.sources[-1] == "cached_calendar_provider_unavailable" and unavailable.confidence == "low"
+
+
 def test_deadline_window_clips_first_and_last_day():
     result = CapacityEngine().calculate_until(
         datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc),
