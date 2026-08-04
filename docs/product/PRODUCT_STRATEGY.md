@@ -17,3 +17,5 @@ The responsive web application supports capture, Today, daily and weekly plannin
 The core remains open source. Hosted-service quotas and operating-cost controls may be added later without placing core planning logic behind proprietary infrastructure.
 
 Durable context supports this promise without turning ChronOS into an opaque assistant. User-confirmed memory, project facts, decisions, notes, and documents remain inspectable and attributable. Retrieval improves explanations and candidate quality, but planning stays useful without it and deterministic feasibility remains authoritative.
+
+External integrations extend context without turning ChronOS into an autonomous mailbox, repository bot, or calendar writer. Settings exposes permissions, selected resources, synchronization, degraded state, reconnect, and revoke controls. Inbox keeps external suggestions separate from user capture and requires review before internal persistence.

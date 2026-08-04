@@ -8,6 +8,7 @@ from app.embeddings.gateway import EmbeddingGateway
 from app.repositories.protocols import RepositorySet
 from app.repositories.supabase import create_repository_set
 from app.core.container import container
+from app.integrations.registry import ConnectorRegistry, build_connector_registry
 
 security = HTTPBearer(auto_error=False)
 
@@ -71,3 +72,11 @@ def get_model_gateway() -> ModelGateway:
 
 def get_embedding_gateway() -> EmbeddingGateway:
     return container.embedding_gateway()
+
+
+def get_connector_registry() -> ConnectorRegistry:
+    # Google compatibility functions are isolated at this construction boundary;
+    # provider-neutral services never import them.
+    from app.services.google_oauth_service import disconnect, get_authorization_url, get_valid_credentials
+    from app.core.config import settings
+    return build_connector_registry(settings, google_auth_url=get_authorization_url, google_revoke=disconnect, google_credentials=get_valid_credentials)

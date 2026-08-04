@@ -36,4 +36,6 @@ npm run build
 
 Frontend tests cover Today, Focus, contextual reflection/recovery, plan success/conflict/transaction failure, adaptive proposal approval, explanation transparency, capacity and overload, profile-only degradation, personal availability validation/persistence, projects and outcomes, routines, weekly proposal accept/edit/reject, Inbox assignment, responsive navigation, timezone rendering, schema incompatibility, logout cache clearing, protected routes, and lazy route fallback.
 
+Integration-focused offline tests cover normalized pagination/idempotency, provider failure/cached fallback, Google recurrence/cancellation/timezone handling, Gmail quote reduction and proposal signals, selected GitHub/Notion resources, Microsoft read contracts, Obsidian archive safety, MCP SSRF/schema/permission controls, and workflow permission enforcement. `tests/integration/test_integrations_supabase.py` is opt-in and verifies two-user RLS, column grants, cross-user mutation denial, proposal rollback, approval atomicity, and safe retry.
+
 Manual profile: use `Asia/Kolkata`, Monday–Saturday, 09:30–18:30, 300 focus minutes, 45 default focus minutes, 10 transition minutes, 60 unscheduled minutes, lunch 13:00–14:00, and a 5-minute quick-task threshold. Confirm meetings, lunch, and transitions cannot overlap before running focus and recovery.

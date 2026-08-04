@@ -115,7 +115,7 @@ def get_authorization_url(user_id: str) -> str:
     return auth_url
 
 
-def exchange_code_for_token(code: str, state: str) -> None:
+def exchange_code_for_token(code: str, state: str) -> str:
     """Exchange the authorization code for tokens and save them through Vault RPC."""
     user_id = validate_oauth_state(state)
     flow = Flow.from_client_config(
@@ -141,6 +141,7 @@ def exchange_code_for_token(code: str, state: str) -> None:
         }
         supabase_client.rpc("set_google_tokens", rpc_payload).execute()
         logger.info("Google Calendar connection stored successfully")
+        return user_id
     except APIError as e:
         logger.error("Failed to save google connection metadata")
         raise ValueError("Database error saving connection") from e

@@ -262,6 +262,15 @@ class ContextPackService:
                 source_type=f"memory:{memory['category']}", excerpt=str(memory["content"])[:600],
                 reason_selected="A confirmed preference, constraint, or pattern relevant to this context.",
                 confidence="high" if memory.get("is_explicit") else "medium", retrieval_method="memory", score=float(memory.get("confidence") or 0)))
+        external_items = self.repositories.integrations.list_items(user_id, project_id=project_id, limit=6)
+        for item in external_items:
+            excerpt = str(item.get("content_summary") or item.get("title") or "")[:600]
+            line = f"Untrusted external context from {item['provider']}: {item['title']}. {excerpt}"
+            if token_estimate("\n".join([*lines, line])) > budget: break
+            lines.append(line)
+            citation = Citation(source_id=str(item["id"]), source_title=str(item["title"]), source_type=f"integration:{item['provider']}", excerpt=excerpt, reason_selected="Recent synchronized context associated with this planning scope.", confidence="medium", retrieval_method="structured", score=.7)
+            pack_citations.append(citation)
+            provenance.append({"type": "integration", "provider": item["provider"], "item_id": str(item["id"]), "untrusted_content": True})
         seen_sources: set[str] = set()
         for citation in citations:
             if citation.source_id in seen_sources: continue

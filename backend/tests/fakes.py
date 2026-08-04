@@ -132,6 +132,15 @@ class MemoryPlanning:
     def list_pending(self, user_id): return [row for row in self.proposals if row.get("user_id", user_id) == user_id and row.get("status") == "pending"]
     def list_calendar_events(self, user_id, start_at, end_at):
         return [row for row in self.events if row.get("user_id", user_id) == user_id and datetime.fromisoformat(str(row["start_at"]).replace("Z", "+00:00")) < end_at and datetime.fromisoformat(str(row["end_at"]).replace("Z", "+00:00")) > start_at]
+    def upsert_external_calendar_event(self, user_id, provider, item):
+        key = f"{provider}:{item['external_id']}"; existing = next((row for row in self.events if row.get("user_id") == user_id and row.get("google_event_id") == key), None)
+        if item.get("deleted_at"):
+            if existing: self.events.remove(existing)
+            return
+        if not item.get("occurred_at") or not item.get("due_at"): return
+        payload = {"user_id": user_id, "google_event_id": key, "title": item["title"], "start_at": item["occurred_at"], "end_at": item["due_at"], "source": provider, "is_chronos_created": False}
+        if existing: existing.update(payload)
+        else: self.events.append(payload)
     def get_proposal(self, user_id, proposal_id): return next((row for row in self.proposals if str(row["id"]) == str(proposal_id) and row.get("user_id", user_id) == user_id), None)
     def create_proposal(self, user_id, data):
         row = {**data, "user_id": user_id}; self.proposals.append(row); return row
@@ -252,6 +261,39 @@ class MemoryContextPacks(MemoryOwned):
     pass
 
 
+class MemoryIntegrations:
+    def __init__(self): self.connections = []; self.items = []; self.proposals = []; self.audit = []
+    def list_connections(self, user_id): return [row for row in self.connections if row["user_id"] == user_id]
+    def get_connection(self, user_id, provider): return next((row for row in self.list_connections(user_id) if row["provider"] == provider), None)
+    def create_connection(self, user_id, data):
+        row = {**data, "user_id": user_id}; self.connections.append(row); return row
+    def update_connection(self, user_id, connection_id, data):
+        row = next((row for row in self.connections if row["user_id"] == user_id and str(row["id"]) == str(connection_id)), None)
+        if not row: raise RuntimeError("not found")
+        row.update(data); return row
+    def list_items(self, user_id, provider=None, project_id=None, limit=100): return [row for row in self.items if row["user_id"] == user_id and not row.get("deleted_at") and (not provider or row["provider"] == provider) and (not project_id or row.get("project_id") == project_id)][:limit]
+    def get_item(self, user_id, item_id): return next((row for row in self.items if row["user_id"] == user_id and str(row["id"]) == str(item_id)), None)
+    def upsert_item(self, user_id, connection_id, provider, data):
+        row = next((row for row in self.items if row["user_id"] == user_id and row["connection_id"] == connection_id and row["external_id"] == data["external_id"]), None)
+        if row: row.update(data); return row
+        row = {**data, "id": data.get("id", str(uuid.uuid4())), "user_id": user_id, "connection_id": connection_id, "provider": provider}; self.items.append(row); return row
+    def list_proposals(self, user_id, status="pending"): return [row for row in self.proposals if row["user_id"] == user_id and row["status"] == status]
+    def create_proposal(self, user_id, data):
+        existing = next((row for row in self.proposals if row["user_id"] == user_id and row["idempotency_key"] == data["idempotency_key"]), None)
+        if existing: return existing
+        row = {**data, "user_id": user_id}; self.proposals.append(row); return row
+    def update_proposal(self, user_id, proposal_id, data):
+        row = next((row for row in self.proposals if row["user_id"] == user_id and str(row["id"]) == str(proposal_id)), None)
+        if not row: raise RuntimeError("not found")
+        row.update(data); return row
+    def approve_proposal(self, user_id, proposal_id, action_type, project_id):
+        row = next((row for row in self.proposals if row["user_id"] == user_id and str(row["id"]) == str(proposal_id)), None)
+        if not row or row["status"] != "pending": raise RuntimeError("not found")
+        row.update(status="approved", action_type=action_type, resolved_at=datetime.now().isoformat())
+        return {"status": "approved", "entity_id": None, "idempotent_replay": False}
+    def append_audit(self, user_id, data): self.audit.append({**data, "user_id": user_id})
+
+
 class MemoryOutcomes(MemoryOwned):
     def __init__(self, rows=None): super().__init__(rows); self.commitments = None
     def list_for_user(self, user_id, project_id=None):
@@ -293,7 +335,7 @@ class MemoryWeeklyPlans(MemoryOwned):
         result = {"status": "approved", "block_ids": block_ids, "idempotent_replay": False}; self.receipts[idempotency_key] = result; return result
 
 
-def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None, projects=None, outcomes=None, routines=None, weekly_plans=None, feedback=None, memory=None, knowledge=None, context_packs=None):
+def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None, projects=None, outcomes=None, routines=None, weekly_plans=None, feedback=None, memory=None, knowledge=None, context_packs=None, integrations=None):
     commitments = commitments or MemoryCommitments(); focus = focus or MemoryFocus(); planning = planning or MemoryPlanning(); reflections = reflections or MemoryReflections(); traces = traces or MemoryTraces()
     commitments.traces = traces
     focus.commitments = commitments; focus.reflections = reflections
@@ -306,4 +348,5 @@ def repositories(*, commitments=None, focus=None, planning=None, reflections=Non
         projects=projects, outcomes=outcomes, routines=routines, weekly_plans=weekly_plans,
         feedback=feedback or MemoryFeedback(), memory=memory or MemoryItems(),
         knowledge=knowledge or MemoryKnowledge(), context_packs=context_packs or MemoryContextPacks(),
+        integrations=integrations or MemoryIntegrations(),
     )

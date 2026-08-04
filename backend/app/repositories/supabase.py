@@ -191,6 +191,15 @@ class SupabasePlanningRepository(_BaseRepository):
         except Exception as exc:
             raise self._failure("calendar.list", exc) from exc
 
+    def upsert_external_calendar_event(self, user_id, provider, item):
+        external_key = f"{provider}:{item['external_id']}"
+        try:
+            if item.get("deleted_at"):
+                self.client.table("calendar_events").delete().eq("user_id", user_id).eq("google_event_id", external_key).eq("is_chronos_created", False).execute(); return
+            if not item.get("occurred_at") or not item.get("due_at"): return
+            self.client.table("calendar_events").upsert({"user_id": user_id, "google_event_id": external_key, "title": item["title"], "start_at": item["occurred_at"], "end_at": item["due_at"], "source": provider, "is_chronos_created": False}, on_conflict="user_id,google_event_id").execute()
+        except Exception as exc: raise self._failure("calendar.external_upsert", exc) from exc
+
     def get_proposal(self, user_id: str, proposal_id: str) -> dict[str, Any] | None:
         try:
             rows = self.client.table("agent_proposed_actions").select("*").eq("user_id", user_id).eq("id", proposal_id).limit(1).execute().data or []
@@ -475,6 +484,69 @@ class SupabaseContextPackRepository(_BaseRepository):
             raise self._failure("context_pack.get", exc) from exc
 
 
+class SupabaseIntegrationsRepository(_BaseRepository):
+    def list_connections(self, user_id):
+        try: return self.client.table("integration_connections").select("*").eq("user_id", user_id).order("provider").execute().data or []
+        except Exception as exc: raise self._failure("integrations.connections", exc) from exc
+    def get_connection(self, user_id, provider):
+        try:
+            rows = self.client.table("integration_connections").select("*").eq("user_id", user_id).eq("provider", provider).limit(1).execute().data or []
+            return rows[0] if rows else None
+        except Exception as exc: raise self._failure("integrations.connection", exc) from exc
+    def create_connection(self, user_id, data):
+        try:
+            rows = self.client.table("integration_connections").insert({**data, "user_id": user_id}).execute().data or []
+            if not rows: raise RuntimeError("insert returned no row")
+            return rows[0]
+        except Exception as exc: raise self._failure("integrations.connect", exc) from exc
+    def update_connection(self, user_id, connection_id, data):
+        try:
+            rows = self.client.table("integration_connections").update(data).eq("user_id", user_id).eq("id", connection_id).execute().data or []
+            if not rows: raise RuntimeError("connection not found")
+            return rows[0]
+        except Exception as exc: raise self._failure("integrations.update", exc) from exc
+    def list_items(self, user_id, provider=None, project_id=None, limit=100):
+        try:
+            query = self.client.table("integration_items").select("*").eq("user_id", user_id).is_("deleted_at", "null")
+            if provider: query = query.eq("provider", provider)
+            if project_id: query = query.eq("project_id", project_id)
+            return query.order("synchronized_at", desc=True).limit(min(limit, 200)).execute().data or []
+        except Exception as exc: raise self._failure("integrations.items", exc) from exc
+    def get_item(self, user_id, item_id):
+        try:
+            rows = self.client.table("integration_items").select("*").eq("user_id", user_id).eq("id", item_id).limit(1).execute().data or []
+            return rows[0] if rows else None
+        except Exception as exc: raise self._failure("integrations.item", exc) from exc
+    def upsert_item(self, user_id, connection_id, provider, data):
+        payload = {**data, "user_id": user_id, "connection_id": connection_id, "provider": provider}
+        try:
+            rows = self.client.table("integration_items").upsert(payload, on_conflict="connection_id,external_id").execute().data or []
+            if not rows: raise RuntimeError("upsert returned no row")
+            return rows[0]
+        except Exception as exc: raise self._failure("integrations.item_upsert", exc) from exc
+    def list_proposals(self, user_id, status="pending"):
+        try: return self.client.table("integration_action_proposals").select("*").eq("user_id", user_id).eq("status", status).order("created_at", desc=True).execute().data or []
+        except Exception as exc: raise self._failure("integrations.proposals", exc) from exc
+    def create_proposal(self, user_id, data):
+        try:
+            rows = self.client.table("integration_action_proposals").upsert({**data, "user_id": user_id}, on_conflict="user_id,idempotency_key").execute().data or []
+            if not rows: raise RuntimeError("proposal insert returned no row")
+            return rows[0]
+        except Exception as exc: raise self._failure("integrations.propose", exc) from exc
+    def update_proposal(self, user_id, proposal_id, data):
+        try:
+            rows = self.client.table("integration_action_proposals").update(data).eq("user_id", user_id).eq("id", proposal_id).execute().data or []
+            if not rows: raise RuntimeError("proposal not found")
+            return rows[0]
+        except Exception as exc: raise self._failure("integrations.proposal_update", exc) from exc
+    def approve_proposal(self, user_id, proposal_id, action_type, project_id):
+        try: return self.client.rpc("approve_integration_proposal_transaction", {"p_user_id": user_id, "p_proposal_id": proposal_id, "p_action_type": action_type, "p_project_id": project_id}).execute().data
+        except Exception as exc: raise self._failure("integrations.proposal_approve", exc) from exc
+    def append_audit(self, user_id, data):
+        try: self.client.table("integration_audit_events").insert({**data, "user_id": user_id}).execute()
+        except Exception as exc: raise self._failure("integrations.audit", exc) from exc
+
+
 class _OwnedCrudRepository(_BaseRepository):
     table_name: str
     label: str
@@ -587,4 +659,5 @@ def create_repository_set(client: Client) -> RepositorySet:
         memory=SupabaseMemoryItemsRepository(client),
         knowledge=SupabaseKnowledgeRepository(client),
         context_packs=SupabaseContextPackRepository(client),
+        integrations=SupabaseIntegrationsRepository(client),
     )

@@ -1,9 +1,17 @@
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from app.main import app
+from app.api.dependencies import get_repositories
+from tests.fakes import repositories
 import pytest
 
 client = TestClient(app)
+
+@pytest.fixture(autouse=True)
+def fake_repositories():
+    app.dependency_overrides[get_repositories] = lambda: repositories()
+    yield
+    app.dependency_overrides.pop(get_repositories, None)
 
 @patch("app.api.v1.google.get_authorization_url")
 def test_get_auth_url(mock_get_url):
@@ -15,7 +23,7 @@ def test_get_auth_url(mock_get_url):
 
 @patch("app.api.v1.google.exchange_code_for_token")
 def test_auth_callback_success(mock_exchange):
-    # Should redirect
+    mock_exchange.return_value = "00000000-0000-0000-0000-000000000001"
     response = client.get("/api/v1/google/auth/callback?code=mockcode&state=mockuser", follow_redirects=False)
     assert response.status_code == 307
     assert "calendar_connected=true" in response.headers["location"]

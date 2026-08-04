@@ -6,6 +6,8 @@ The React frontend owns presentation and client interactions. TanStack Query own
 
 FastAPI owns authentication, deterministic planning, model access, bounded workflows, overlap and capacity validation, repositories, and integration adapters. `ApplicationContainer` constructs live clients lazily; imports do not open network clients.
 
+External providers implement a provider-neutral connector contract and normalize into migration 027 repositories. Integration context enters Inbox and context packs with provenance and an untrusted-content marker. Google Calendar mirrors normalized events into the existing calendar repository so capacity and planning retain one deterministic calendar model.
+
 Groq is accessed only through the provider-neutral `ModelGateway`. Structured responses receive Pydantic validation and at most one bounded repair request. Intake, adaptive planning, and adaptive recovery reserve that repair inside their workflow request budgets. Provider prompts and raw responses are not written to traces or logs.
 
 Application code targets protocols in `app/repositories` and `app/models`. Supabase and Groq are adapters. The `core.database` facade remains only for historical paths listed below and must not be used by new core-journey code.
@@ -34,6 +36,6 @@ Focus lifecycle endpoints create or start a session, persist pause/resume timing
 
 Repository-backed core paths: intake workflow runs and traces; approved commitment/task/time-spine writes; commitment list/detail; Today; Plan; focus lifecycle; contextual recovery; contextual reflection; planning profiles; core time-spine updates; and trace viewing. Application services do not import the compatibility Supabase client.
 
-Compatibility access remains in legacy calendar, command, and scheduling API modules; the legacy scheduling and rescue graphs; and Google OAuth/calendar infrastructure adapters. These paths are outside Today, Inbox approval, Plan, Focus, contextual recovery, contextual reflection, and commitment detail. The compatibility client also remains at the API dependency construction boundary until historical routes move to the application container.
+Compatibility access remains in legacy command and scheduling APIs, the historical capacity/rescue/scheduling services, and `google_calendar_service.py` for legacy callers and the opt-in historical live test. The shared `/calendar` and `/integrations` synchronization paths no longer call that service. Google OAuth Vault functions remain isolated at the connector-construction boundary until credential storage receives a provider-neutral Vault adapter. These paths are outside Today, Inbox approval, Plan, Focus, contextual recovery, contextual reflection, and commitment detail.
 
 Migration 019 adds focus lifecycle state, migration 020 adds the planning profile, migration 021 adds core idempotent transaction RPCs and operation receipts, migration 022 adds atomic adaptive-plan approval, migration 023 hardens its definer boundary, migration 024 adds projects/outcomes/routines/weekly plans, migration 025 adds onboarding and personalization, and migration 026 adds attributable memory, knowledge, retrieval, and context packs. Intake approval, focus completion, recovery approval, adaptive-plan approval, weekly-plan approval, and knowledge ingestion perform their related writes atomically in PostgreSQL.

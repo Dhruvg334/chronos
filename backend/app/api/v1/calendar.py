@@ -3,10 +3,11 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 
-from app.api.dependencies import get_current_user, get_repositories
+from app.api.dependencies import get_connector_registry, get_current_user, get_repositories
 from app.core.errors import ChronosError, ErrorCode
 from app.repositories.protocols import RepositorySet
-from app.services.google_calendar_service import sync_calendar_events, get_free_busy
+from app.integrations.registry import ConnectorRegistry
+from app.integrations.service import IntegrationService
 
 router = APIRouter()
 
@@ -15,12 +16,12 @@ class FreeBusyRequest(BaseModel):
     time_max: datetime
 
 @router.post("/sync")
-def sync_calendar(user_id: str = Depends(get_current_user)):
+def sync_calendar(user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories), registry: ConnectorRegistry = Depends(get_connector_registry)):
     """Sync primary calendar events to ChronOS."""
-    success = sync_calendar_events(user_id)
-    if not success:
+    result = IntegrationService(repositories, registry).sync(user_id, "google_calendar")
+    if result.get("state") != "connected":
         raise HTTPException(status_code=500, detail="Failed to sync calendar. Ensure Google Calendar is connected.")
-    return {"success": True, "message": "Calendar synced successfully"}
+    return {"success": True, "message": "Calendar synced successfully", "item_count": result["item_count"]}
 
 @router.get("/events")
 def get_events(user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> Dict[str, Any]:
@@ -32,14 +33,16 @@ def get_events(user_id: str = Depends(get_current_user), repositories: Repositor
         raise ChronosError(ErrorCode.PERSISTENCE, "Calendar events are temporarily unavailable.") from exc
 
 @router.post("/free-busy")
-def fetch_free_busy(req: FreeBusyRequest, user_id: str = Depends(get_current_user)) -> Dict[str, Any]:
+def fetch_free_busy(req: FreeBusyRequest, user_id: str = Depends(get_current_user), registry: ConnectorRegistry = Depends(get_connector_registry)) -> Dict[str, Any]:
     """Fetch free/busy slots from Google Calendar."""
     if not req.time_min.tzinfo:
         req.time_min = req.time_min.replace(tzinfo=timezone.utc)
     if not req.time_max.tzinfo:
         req.time_max = req.time_max.replace(tzinfo=timezone.utc)
         
-    busy = get_free_busy(user_id, req.time_min, req.time_max)
+    connector = registry.get("google_calendar")
+    try: busy = connector.free_busy(user_id, req.time_min, req.time_max)
+    except Exception: busy = None
     if busy is None:
         raise HTTPException(status_code=500, detail="Failed to fetch free/busy data. Ensure Google Calendar is connected.")
         

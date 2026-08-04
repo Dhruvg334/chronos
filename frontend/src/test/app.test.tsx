@@ -12,6 +12,7 @@ import Week from '../pages/Week';
 import Settings from '../pages/Settings';
 import Today from '../pages/Today';
 import Onboarding from '../pages/Onboarding';
+import Inbox from '../pages/Inbox';
 import { CommitmentDraftCard } from '../components/intake/CommitmentDraftCard';
 import type { ActiveFocusSession, PlanResponse, TodayResponse } from '../types/api';
 
@@ -31,6 +32,7 @@ let onboardingStep: number;
 let savedPreferences: Record<string, unknown> | null;
 let memoryItems: Array<Record<string, unknown>>;
 let knowledgeSources: Array<Record<string, unknown>>;
+let externalProposals: Array<Record<string, unknown>>;
 
 const preferences = { planning_style: 'balanced' as const, recommendation_frequency: 'normal' as const, approval_strictness: 'always_ask' as const, internal_write_automation_enabled: false, preferred_focus_durations: [25,45,60], routine_continuity_preference: 'gentle' as const, quick_task_mode: 'batch' as const, strategy_preferences: ['eisenhower_triage','task_batching','continuity_recovery','focus_interval','constrained_day','quick_action','time_blocking'], explanation_detail: 'standard' as const };
 const planningProfile = { timezone: 'Asia/Kolkata', available_weekdays: [0, 1, 2, 3, 4, 5], working_start_time: '09:30:00', working_end_time: '18:30:00', daily_focus_limit_minutes: 300, default_focus_duration_minutes: 45, minimum_transition_buffer_minutes: 10, minimum_daily_unscheduled_buffer_minutes: 60, protected_interval_start: '13:00:00', protected_interval_end: '14:00:00', quick_task_threshold_minutes: 5, onboarding_status: 'completed' as const, onboarding_step: 3, onboarding_completed_at: '2026-08-04T00:00:00Z', ...preferences };
@@ -60,8 +62,15 @@ beforeEach(() => {
   savedPreferences = null;
   memoryItems = [{ id: 'm1', category: 'working_pattern', content: 'I underestimated authentication debugging twice.', source_type: 'reflection', source_reference: { label: 'Proposed from a reflection' }, confidence: .65, is_explicit: false, status: 'proposed', conflicts: [] }];
   knowledgeSources = [];
+  externalProposals = [{ id: 'ep1', connection_id: 'ic1', integration_item_id: 'ii1', provider: 'gmail', action_type: 'create_task', safe_summary: 'Email appears to contain deadline and dependency: Auth regression deadline', source_excerpt: 'Please finish before 3 PM tomorrow. Deployment cannot proceed until tests pass.', status: 'pending' }];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith('/api/v1/integrations')) return json({ integrations: [{ provider: 'google_calendar', state: 'connected', configured: true, read_only: true, capabilities: [{ name: 'sync', permission_class: 'read_external', required_scopes: [], data_accessed: ['selected calendar events'], approval_required: false }], requested_scopes: ['calendar.readonly'], last_success_at: '2026-08-04T10:00:00Z', selected_resources: ['primary'], message: 'Connected with read-only access.' }, { provider: 'gmail', state: 'unavailable', configured: false, read_only: true, capabilities: [{ name: 'sync', permission_class: 'read_external', required_scopes: [], data_accessed: ['recent messages'], approval_required: false }], requested_scopes: ['gmail.readonly'], last_success_at: null, selected_resources: [], message: 'Server credentials are not configured.' }, { provider: 'obsidian', state: 'available', configured: true, read_only: true, capabilities: [{ name: 'import_markdown', permission_class: 'read_external', required_scopes: [], data_accessed: ['files selected by you'], approval_required: false }], requested_scopes: [], last_success_at: null, selected_resources: [], message: 'Import only the Markdown files or ZIP you choose.' }] });
+    if (url.endsWith('/api/v1/integrations/proposals/pending')) return json({ proposals: externalProposals });
+    if (url.includes('/api/v1/integrations/proposals/') && url.endsWith('/approve')) { externalProposals = []; return json({ status: 'approved', entity_id: 'c2' }); }
+    if (url.includes('/api/v1/integrations/proposals/') && url.endsWith('/decision')) { externalProposals = []; return json({ status: 'dismissed' }); }
+    if (url.endsWith('/api/v1/integrations/google_calendar/sync')) return json({ state: 'connected', item_count: 2 });
+    if (url.endsWith('/api/v1/integrations/google_calendar/disconnect')) return json({ status: 'revoked' });
     if (url.endsWith('/api/v1/context/memory') && init?.method === 'POST') { const body = JSON.parse(String(init.body)); const item = { id: 'm2', ...body, source_type: 'user', source_reference: { label: 'Added by you' }, confidence: 1, is_explicit: true, status: 'confirmed', conflicts: [] }; memoryItems.push(item); return json(item, 201); }
     if (url.endsWith('/api/v1/context/memory')) return json({ items: memoryItems });
     if (url.includes('/api/v1/context/memory/') && url.endsWith('/decision')) { const id = url.split('/').at(-2); const body = JSON.parse(String(init?.body)); memoryItems = memoryItems.map((item) => item.id === id ? { ...item, status: body.decision === 'confirm' ? 'confirmed' : body.decision === 'reject' ? 'rejected' : 'archived' } : item); return json(memoryItems.find((item) => item.id === id)); }
@@ -391,6 +400,25 @@ it('allows optional Inbox project assignment and type classification', async () 
   expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'project_outcome' }));
   await user.selectOptions(screen.getByLabelText(/project for production deployment/i), 'p1');
   expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ project_id: 'p1' }));
+});
+
+it('shows integration permissions and connection state without technical secrets', async () => {
+  renderWithContext(<Settings />, { path: '/settings' });
+  expect(await screen.findByRole('heading', { name: 'Integrations' })).toBeInTheDocument();
+  expect(screen.getByText('Google Calendar')).toBeInTheDocument();
+  expect(screen.getByText(/files selected by you/i)).toBeInTheDocument();
+  expect(screen.queryByText(/access_token|sync_cursor|client_secret/i)).not.toBeInTheDocument();
+});
+
+it('keeps external-source Inbox proposals separate and approval-first', async () => {
+  const user = userEvent.setup(); renderWithContext(<Inbox />, { path: '/inbox' });
+  expect(await screen.findByRole('heading', { name: 'From connected sources' })).toBeInTheDocument();
+  expect(screen.getByText(/Nothing is added automatically/i)).toBeInTheDocument();
+  await user.click(screen.getByText('Inspect source'));
+  expect(screen.getByText(/Deployment cannot proceed until tests pass/i)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Accept' }));
+  expect(await screen.findByPlaceholderText(/For example/i)).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'From connected sources' })).not.toBeInTheDocument();
 });
 
 it('keeps responsive primary navigation concise and functional', async () => {

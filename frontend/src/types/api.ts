@@ -318,3 +318,6 @@ export interface IntegrationStatus {
   planning_mode: 'calendar_and_profile' | 'profile_only';
   message: string;
 }
+
+export interface IntegrationCatalogItem { provider: string; state: 'available' | 'connected' | 'degraded' | 'expired' | 'revoked' | 'disconnected' | 'error' | 'unavailable'; configured: boolean; read_only: true; capabilities: Array<{ name: string; permission_class: string; required_scopes: string[]; data_accessed: string[]; approval_required: boolean }>; requested_scopes: string[]; last_success_at: string | null; selected_resources: string[]; message: string }
+export interface ExternalProposal { id: string; connection_id: string; integration_item_id: string; provider?: string; action_type: 'create_task' | 'create_outcome' | 'create_event' | 'create_reference'; safe_summary: string; source_excerpt?: string; status: 'pending'; created_at?: string }

@@ -42,6 +42,21 @@ class Settings(BaseSettings):
     GOOGLE_SCOPES: str = "https://www.googleapis.com/auth/calendar.readonly"
     FRONTEND_URL: str = "http://localhost:5173"
     GOOGLE_OAUTH_STATE_SECRET: str = ""
+    GMAIL_CLIENT_ID: str = ""
+    GMAIL_CLIENT_SECRET: str = ""
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    NOTION_CLIENT_ID: str = ""
+    NOTION_CLIENT_SECRET: str = ""
+    MICROSOFT_CLIENT_ID: str = ""
+    MICROSOFT_CLIENT_SECRET: str = ""
+    MICROSOFT_TENANT_ID: str = "common"
+    INTEGRATION_REQUEST_TIMEOUT_SECONDS: float = 15.0
+    INTEGRATION_MAX_RETRIES: int = 1
+    INTEGRATION_MAX_PAGES: int = 10
+    MCP_ALLOWED_SERVERS: List[str] = []
+    MCP_REQUEST_TIMEOUT_SECONDS: float = 10.0
+    MCP_REQUEST_BUDGET: int = 4
     
     # Encryption key (32-byte url-safe base64 string)
     ENCRYPTION_KEY: str = ""

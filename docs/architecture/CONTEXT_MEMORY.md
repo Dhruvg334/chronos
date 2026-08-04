@@ -23,3 +23,5 @@ Hybrid retrieval runs in PostgreSQL with dense cosine rank, lexical rank, determ
 Daily, weekly, project, recovery, stuck, and reflection packs order structured entities first, then confirmed explicit/inferred memory, then deduplicated retrieved excerpts. Each pack has a token budget and short expiration. Summaries are deterministic source compilations rather than hidden model reasoning. Adaptive planning and recovery may include these packs, but all candidate plans, permissions, overlap, availability, capacity, dependency, and approval checks remain authoritative.
 
 The UI places memory and knowledge inside Settings. Users can inspect sources and correction history, confirm or reject proposals, resolve conflicts, archive items, export memory, and inspect exact excerpts that materially affected plan explanations.
+
+Normalized integration items are an additional structured context source. Context packs label them by provider, include bounded excerpts and ownership-safe references, and mark them untrusted. They do not become knowledge sources or memory automatically. Provider outages retain cached context and do not block planning.

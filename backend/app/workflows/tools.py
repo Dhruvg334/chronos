@@ -11,10 +11,17 @@ ResultT = TypeVar("ResultT", bound=BaseModel)
 
 
 class PermissionClass(StrEnum):
-    INTERNAL_READ = "internal_read"
-    INTERNAL_WRITE = "internal_write"
-    EXTERNAL_READ = "external_read"
-    EXTERNAL_WRITE = "external_write"
+    READ_INTERNAL = "read_internal"
+    READ_EXTERNAL = "read_external"
+    PROPOSE_INTERNAL_WRITE = "propose_internal_write"
+    APPROVED_INTERNAL_WRITE = "approved_internal_write"
+    PROPOSE_EXTERNAL_WRITE = "propose_external_write"
+    APPROVED_EXTERNAL_WRITE = "approved_external_write"
+    PROHIBITED = "prohibited"
+    INTERNAL_READ = "read_internal"
+    EXTERNAL_READ = "read_external"
+    INTERNAL_WRITE = "approved_internal_write"
+    EXTERNAL_WRITE = "approved_external_write"
 
 
 @dataclass(frozen=True)
@@ -28,10 +35,15 @@ class ToolSpec(Generic[InputT, ResultT]):
     idempotent: bool
     audit_category: str
     handler: Callable[[InputT], Awaitable[ResultT]]
+    required_scopes: tuple[str, ...] = ()
+    data_accessed: tuple[str, ...] = ()
+    approval_required: bool = False
+    idempotency_behavior: str = "not_applicable"
+    rollback_capability: str = "none"
 
     @property
     def is_write(self) -> bool:
-        return self.permission in {PermissionClass.INTERNAL_WRITE, PermissionClass.EXTERNAL_WRITE}
+        return self.permission in {PermissionClass.APPROVED_INTERNAL_WRITE, PermissionClass.APPROVED_EXTERNAL_WRITE}
 
     def validate_input(self, raw: dict[str, Any]) -> InputT:
         return self.input_type.model_validate(raw)
