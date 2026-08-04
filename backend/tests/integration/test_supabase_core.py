@@ -233,3 +233,18 @@ def test_projects_routines_weekly_plan_rls_and_atomic_approval(live):
     assert failed["status"] == "failed" and admin.table("focus_blocks").select("id").in_("id", rollback_ids).execute().data == []
     assert repositories.weekly_plans.get_for_user(alpha_id, rollback["id"])["status"] == "pending"
     with pytest.raises(Exception): beta.rpc("approve_weekly_plan_transaction", {"p_user_id": beta_id, "p_plan_id": rollback["id"], "p_idempotency_key": f"weekly-{uuid.uuid4()}", "p_block_ids": rollback_ids}).execute()
+
+
+def test_personalization_feedback_is_owned_and_invalid_insert_rolls_back(live):
+    admin, alpha, beta, alpha_id, _ = live
+    alpha.auth.sign_in_with_password({"email": ALPHA, "password": PASSWORD})
+    feedback_id = str(uuid.uuid4())
+    created = alpha.table("recommendation_feedback").insert({"id": feedback_id, "user_id": alpha_id, "recommendation_type": "strategy", "recommendation_key": "task_batching", "context_summary": {"surface": "today"}, "user_action": "useful"}).execute().data
+    assert created and created[0]["id"] == feedback_id
+    assert beta.table("recommendation_feedback").select("*").eq("id", feedback_id).execute().data == []
+    with pytest.raises(Exception):
+        beta.table("recommendation_feedback").insert({"user_id": alpha_id, "recommendation_type": "strategy", "context_summary": {}, "user_action": "used"}).execute()
+    invalid_id = str(uuid.uuid4())
+    with pytest.raises(Exception):
+        alpha.table("recommendation_feedback").insert({"id": invalid_id, "user_id": alpha_id, "recommendation_type": "strategy", "context_summary": {"raw_prompt": "x" * 5000}, "user_action": "unsupported"}).execute()
+    assert admin.table("recommendation_feedback").select("id").eq("id", invalid_id).execute().data == []

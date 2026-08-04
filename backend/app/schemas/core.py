@@ -41,10 +41,14 @@ class ActiveFocusView(BaseModel):
 
 
 class RecoveryView(BaseModel):
+    recommendation_key: str
     commitment_id: str
     title: str
+    what_changed: str
+    failure_mode: str
     reason: str
-    options: tuple[str, ...]
+    options: tuple[dict, ...] = Field(max_length=3)
+    recommended_option_id: str
     requires_approval: Literal[True] = True
 
 
@@ -60,6 +64,8 @@ class TodayResponse(BaseModel):
     recovery: RecoveryView | None = None
     explanation: dict | None = None
     routines_due: list[dict] = Field(default_factory=list, max_length=6)
+    focus_duration_options: list[int] = Field(default_factory=lambda: [25, 45, 60], min_length=1, max_length=5)
+    explanation_detail: Literal["brief", "standard", "detailed"] = "standard"
 
 
 class StrategyRecommendationRequest(BaseModel):
@@ -129,7 +135,9 @@ class StopFocusRequest(BaseModel):
 
 class StuckResponse(BaseModel):
     focus_block_id: str
-    options: tuple[str, ...]
+    failure_mode: str
+    options: tuple[dict, ...] = Field(max_length=6)
+    recommended_option_id: str
     recovery_available: bool
 
 

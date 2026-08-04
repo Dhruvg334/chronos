@@ -11,13 +11,13 @@ export function WhyThisPlan({ explanation }: { explanation: PlanExplanation }) {
         </span>
       </div>
       <p className="mt-3 text-sm text-muted">{explanation.next_action_reason}</p>
-      <p className="mt-3 text-xs text-faint">
+      {explanation.detail !== "brief" && <p className="mt-3 text-xs text-faint">
         Considered: {explanation.constraints_considered.join(", ")}.
-      </p>
-      {explanation.deferred.length > 0 && (
+      </p>}
+      {explanation.detail !== "brief" && explanation.deferred.length > 0 && (
         <p className="mt-2 text-xs text-faint">Deferred: {explanation.deferred.join(", ")}.</p>
       )}
-      <p className="mt-2 text-xs text-muted">{explanation.changed}</p>
+      {explanation.detail === "detailed" && explanation.changed && <p className="mt-2 text-xs text-muted">{explanation.changed}</p>}
       {explanation.requires_approval && (
         <p className="mt-3 text-xs font-medium text-accent-strong">Any plan change still requires your approval.</p>
       )}

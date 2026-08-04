@@ -72,6 +72,7 @@ class PlanningDomainsService:
 
     def list_routines(self, user_id: str, *, start: date | None = None, days: int = 7) -> list[dict[str, Any]]:
         start = start or date.today()
+        continuity_preference = PlanningProfile.model_validate(self.repositories.planning_profiles.get(user_id)).routine_continuity_preference
         persisted = {(str(row["routine_id"]), str(row["occurrence_date"])): row for row in self.repositories.routines.list_occurrences(user_id, datetime.combine(start, time.min), datetime.combine(start + timedelta(days=days), time.min))}
         result = []
         for routine in self.repositories.routines.list_for_user(user_id):
@@ -83,7 +84,10 @@ class PlanningDomainsService:
                         saved = persisted.get((str(routine["id"]), day.isoformat()))
                         occurrences.append({"date": day.isoformat(), "status": saved.get("status", "due") if saved else "due", "preferred_time": str(routine.get("preferred_time") or "")[:5] or None})
             continuity = routine.get("continuity_json") or {}
-            result.append({**_public_row(routine), "occurrences": occurrences, "continuity_recovery": routine.get("minimum_viable_version") if continuity.get("last_status") == "skipped" else None})
+            recovery = None
+            if continuity.get("last_status") == "skipped":
+                recovery = routine.get("minimum_viable_version") if continuity_preference in {"gentle", "standard"} else f"Resume the normal {routine.get('estimated_duration_minutes')} minute version"
+            result.append({**_public_row(routine), "occurrences": occurrences, "continuity_recovery": recovery})
         return result
 
     def create_routine(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:

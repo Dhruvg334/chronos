@@ -14,6 +14,7 @@ const Week = lazy(() => import('./pages/Week'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Signup = lazy(() => import('./pages/Signup'));
 const Today = lazy(() => import('./pages/Today'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
 
 export function RouteFallback() {
   return <div role="status" aria-live="polite" className="flex min-h-screen items-center justify-center bg-canvas px-4 text-sm font-medium text-muted">Loading ChronOS…</div>;
@@ -29,6 +30,7 @@ export function AppRoutes() {
     <Route path="/demo" element={<Demo />} />
     <Route element={<ProtectedRoute />}>
       <Route path="/today" element={<Today />} />
+      <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/inbox" element={<Inbox />} />
       <Route path="/plan" element={<Plan />} />
       <Route path="/week" element={<Week />} />

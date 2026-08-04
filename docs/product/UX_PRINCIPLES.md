@@ -10,6 +10,8 @@ Inbox begins with one plain-language input. Extraction preserves uncertainty, pr
 
 Inbox classification distinguishes outcomes, tasks, routines, events, and references. Project assignment is optional; creating a project is always an explicit choice.
 
+First-run setup is skippable, resumable, and no longer than three steps. It asks only for planning boundaries and style; integrations remain optional. Returning users see setup again only when they explicitly reopen it from Settings.
+
 ## Make time concrete
 
 Plan combines cached calendar events, plan blocks, unscheduled commitments, personal availability, remaining/over-capacity minutes, and buffer guidance. It labels profile-only planning and calendar confidence honestly. Working-window, protected-time, transition, overlap, and capacity errors remain visible and actionable.
@@ -29,6 +31,10 @@ Projects use progressive disclosure: the list emphasizes status and progress, wh
 ## Explain consequences
 
 Strategy and recovery recommendations state why they apply, evidence, confidence, action, trade-off, and that no automatic change occurs. Plan mutation waits for explicit approval.
+
+Planning style, recommendation frequency, explanation detail, quick-task handling, focus durations, routine continuity, enabled strategies, and the internal approval boundary are explicit user preferences. Feedback records only concise recommendation context and user action—never prompts or hidden reasoning.
+
+Recovery stays contextual and calm: explain what changed, name the likely failure mode, show no more than three trade-off-bearing options, recommend one, and support approval, postponement, or dismissal in an accessible focused dialog.
 
 “Why this plan?” shows constraints, selection summary, deferred work, whether AI assisted, and the approval boundary. It never exposes raw prompts, internal trace payloads, or hidden reasoning. Adaptive planning shows one validated recommendation even when the model proposed several candidates.
 

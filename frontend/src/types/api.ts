@@ -217,10 +217,16 @@ export interface TodayResponse {
   strategy_recommendation: StrategyRecommendation | null;
   pending_approval_count: number;
   active_focus_session: ActiveFocusSession | null;
-  recovery: { commitment_id: string; title: string; reason: string; options: string[]; requires_approval: true } | null;
+  recovery: RecoverySummary | null;
   explanation?: PlanExplanation | null;
   routines_due?: Array<{ id: string; title: string; preferred_time?: string | null; duration_minutes: number; minimum_viable_version: string }>;
+  focus_duration_options: number[];
+  explanation_detail: 'brief' | 'standard' | 'detailed';
 }
+
+export interface RecoveryOption { id: string; title: string; rationale: string; tradeoff: string; expected_impact: string; feasible: boolean; requires_approval: true }
+export interface RecoverySummary { recommendation_key: string; commitment_id: string; title: string; what_changed: string; failure_mode: string; reason: string; options: RecoveryOption[]; recommended_option_id: string; requires_approval: true }
+export interface StuckOption { id: string; title: string; rationale: string; duration_minutes?: number; commitment_id?: string; requires_approval: boolean }
 
 export interface ProjectSummary { id: string; title: string; description: string; status: 'active' | 'paused' | 'completed' | 'archived'; target_date?: string | null; colour: string; outcome_count: number; completed_outcome_count: number; progress_percent: number; next_action?: string | null }
 export interface Outcome { id: string; project_id?: string | null; title: string; description: string; status: 'active' | 'blocked' | 'uncertain' | 'completed' | 'archived'; target_date?: string | null; importance: number; estimated_effort_minutes?: number | null; confidence: number; completion_criteria: string; provenance?: string | null }
@@ -231,6 +237,7 @@ export interface WeeklyView { week_start: string; timezone: string; days: Weekly
 export interface WeeklyProposal { id: string; status: 'pending' | 'approved' | 'rejected'; week_start: string; focus_set: Array<{ id: string; title: string; project_title?: string | null }>; blocks: Array<{ commitment_id: string; title: string; start_at: string; duration_minutes: number; outcome_id?: string | null; project_id?: string | null }>; deferred: Array<{ id: string; title: string; reason: string }>; explanation: { constraints_considered: string[]; summary: string; ai_used: boolean; requires_approval: boolean }; requires_approval: boolean }
 
 export interface PlanExplanation {
+  detail?: 'brief' | 'standard' | 'detailed';
   constraints_considered: string[];
   next_action_reason: string;
   deferred: string[];
@@ -279,8 +286,22 @@ export interface PlanningProfile {
   protected_interval_start: string | null;
   protected_interval_end: string | null;
   quick_task_threshold_minutes: number;
+  onboarding_status: 'not_started' | 'in_progress' | 'completed' | 'skipped';
+  onboarding_step: number;
+  onboarding_completed_at?: string | null;
+  planning_style: 'guided' | 'balanced' | 'minimal';
+  recommendation_frequency: 'low' | 'normal' | 'high';
+  approval_strictness: 'always_ask' | 'allow_reversible';
+  internal_write_automation_enabled: boolean;
+  preferred_focus_durations: number[];
+  routine_continuity_preference: 'gentle' | 'standard' | 'structured';
+  quick_task_mode: 'immediate' | 'batch';
+  strategy_preferences: string[];
+  explanation_detail: 'brief' | 'standard' | 'detailed';
   updated_at?: string | null;
 }
+
+export type PersonalPreferences = Pick<PlanningProfile, 'planning_style' | 'recommendation_frequency' | 'approval_strictness' | 'internal_write_automation_enabled' | 'preferred_focus_durations' | 'routine_continuity_preference' | 'quick_task_mode' | 'strategy_preferences' | 'explanation_detail'>;
 
 export interface IntegrationStatus {
   provider: string;

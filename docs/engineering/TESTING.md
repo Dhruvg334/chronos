@@ -13,6 +13,8 @@ python -m pytest -m integration
 
 Runtime tests cover step and request budgets, timeouts, unknown tools, argument/result validation, read execution, internal/external write approval, model selection, idempotency metadata, and trace persistence. Core tests cover Today, Strategy Engine cases, profile capacity, Plan, Focus, intake, recovery, reflection, settings validation, projects, outcome linking, routine scheduling/continuity, weekly capacity/proposal validation, approval, ownership, and injected transaction rollback.
 
+Focused personalization tests cover onboarding save/resume/skip/completion, preference-driven strategy and explanation behavior, focus-duration options, deterministic stuck guidance, recovery dismissal/approval boundaries, concise feedback redaction, and feedback RLS ownership.
+
 Integration tests are opt-in. Set `RUN_SUPABASE_INTEGRATION=1`, `SUPABASE_TEST_URL`, `SUPABASE_TEST_ANON_KEY`, and `SUPABASE_TEST_SERVICE_ROLE_KEY` from a disposable local stack. Without them, integration tests skip clearly. Live tests provision `chronos.alpha@example.com` and `chronos.beta@example.com`, exercise the core journey, and verify direct-JWT and backend ownership boundaries.
 
 Set `RUN_GROQ_INTEGRATION=1` with Groq settings in `backend/.env` to run live structured intake, adaptive-plan validation, bounded recovery, provider metadata, and redaction/error-classification checks. The opt-in flag must still be present in the process environment. Set `RUN_GOOGLE_INTEGRATION=1` with backend Google credentials, `GOOGLE_OAUTH_STATE_SECRET`, `GOOGLE_TEST_USER_ID`, and disposable local Supabase configuration to validate a pre-authorized Vault-backed read-only connection, refresh, sync, and free/busy path. These tests never run by default.

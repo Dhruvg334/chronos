@@ -61,6 +61,11 @@ class PlanningProfileRepository(Protocol):
     def reset(self, user_id: str) -> dict[str, Any]: ...
 
 
+class RecommendationFeedbackRepository(Protocol):
+    def create(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]: ...
+    def list_for_user(self, user_id: str, limit: int = 50) -> list[dict[str, Any]]: ...
+
+
 class ProjectsRepository(Protocol):
     def list_for_user(self, user_id: str) -> list[dict[str, Any]]: ...
     def get_for_user(self, user_id: str, project_id: str) -> dict[str, Any] | None: ...
@@ -105,3 +110,4 @@ class RepositorySet:
     outcomes: OutcomesRepository
     routines: RoutinesRepository
     weekly_plans: WeeklyPlansRepository
+    feedback: RecommendationFeedbackRepository

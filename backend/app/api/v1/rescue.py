@@ -11,6 +11,8 @@ from app.core.errors import ChronosError, ErrorCode
 from app.core.observability import request_id_context
 from app.models.gateway import ModelGateway
 from app.repositories.protocols import RepositorySet
+from app.schemas.personalization import RecoveryChoiceCreate
+from app.api.v1.recommendations import concise_context
 from app.services.core_journey import rank_commitments
 from app.workflows.adaptive_recovery import AdaptiveRecoveryWorkflow
 from app.workflows.runtime import WorkflowRunner
@@ -72,3 +74,16 @@ def reject_rescue_proposal(proposal_id: str, user_id: str = Depends(get_current_
     _pending(repositories, user_id, proposal_id)
     repositories.planning.update_proposal(user_id, proposal_id, {"status": "rejected"})
     return {"status": "rejected"}
+
+
+@router.post("/choices")
+def record_recovery_choice(request: RecoveryChoiceCreate, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)) -> dict[str, Any]:
+    row = repositories.feedback.create(user_id, {
+        "id": str(uuid.uuid4()),
+        "recommendation_type": "recovery",
+        "recommendation_key": request.recommendation_key,
+        "context_summary": concise_context({"surface": "recovery", "failure_mode": request.failure_mode, "option_id": request.option_id}),
+        "user_action": request.choice,
+        "reason_category": request.reason_category,
+    })
+    return {"id": row["id"], "status": "recorded", "plan_changed": False}

@@ -172,12 +172,20 @@ class MemoryPlanningProfiles:
         "minimum_daily_unscheduled_buffer_minutes": 60,
         "protected_interval_start": None, "protected_interval_end": None,
         "quick_task_threshold_minutes": 5,
+        "onboarding_status": "not_started", "onboarding_step": 1, "onboarding_completed_at": None,
+        "planning_style": "balanced", "recommendation_frequency": "normal",
+        "approval_strictness": "always_ask", "internal_write_automation_enabled": False,
+        "preferred_focus_durations": [25, 45, 60], "routine_continuity_preference": "gentle",
+        "quick_task_mode": "batch", "strategy_preferences": ["eisenhower_triage", "task_batching", "continuity_recovery", "focus_interval", "constrained_day", "quick_action", "time_blocking"],
+        "explanation_detail": "standard",
     }
     def __init__(self, rows=None): self.rows = dict(rows or {})
     def get(self, user_id): return {**self.DEFAULTS, **self.rows.get(user_id, {})}
     def update(self, user_id, data):
         self.rows[user_id] = {**self.get(user_id), **data}; return self.rows[user_id]
-    def reset(self, user_id): self.rows[user_id] = self.DEFAULTS.copy(); return self.rows[user_id]
+    def reset(self, user_id):
+        availability = {key: self.DEFAULTS[key] for key in ("timezone", "available_weekdays", "working_start_time", "working_end_time", "daily_focus_limit_minutes", "default_focus_duration_minutes", "minimum_transition_buffer_minutes", "minimum_daily_unscheduled_buffer_minutes", "protected_interval_start", "protected_interval_end", "quick_task_threshold_minutes")}
+        self.rows[user_id] = {**self.get(user_id), **availability}; return self.rows[user_id]
 
 
 class MemoryOwned:
@@ -193,6 +201,10 @@ class MemoryOwned:
 
 
 class MemoryProjects(MemoryOwned): pass
+
+
+class MemoryFeedback(MemoryOwned):
+    def list_for_user(self, user_id, limit=50): return super().list_for_user(user_id)[-limit:]
 
 
 class MemoryOutcomes(MemoryOwned):
@@ -236,11 +248,11 @@ class MemoryWeeklyPlans(MemoryOwned):
         result = {"status": "approved", "block_ids": block_ids, "idempotent_replay": False}; self.receipts[idempotency_key] = result; return result
 
 
-def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None, projects=None, outcomes=None, routines=None, weekly_plans=None):
+def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None, projects=None, outcomes=None, routines=None, weekly_plans=None, feedback=None):
     commitments = commitments or MemoryCommitments(); focus = focus or MemoryFocus(); planning = planning or MemoryPlanning(); reflections = reflections or MemoryReflections(); traces = traces or MemoryTraces()
     commitments.traces = traces
     focus.commitments = commitments; focus.reflections = reflections
     planning.focus = focus; planning.traces = traces
     projects = projects or MemoryProjects(); outcomes = outcomes or MemoryOutcomes(); routines = routines or MemoryRoutines(); weekly_plans = weekly_plans or MemoryWeeklyPlans()
     outcomes.commitments = commitments; weekly_plans.focus = focus; commitments.outcomes = outcomes; commitments.routines = routines
-    return RepositorySet(commitments, focus, planning, reflections, traces, google or MemoryGoogle(), profiles or MemoryPlanningProfiles(), projects, outcomes, routines, weekly_plans)
+    return RepositorySet(commitments, focus, planning, reflections, traces, google or MemoryGoogle(), profiles or MemoryPlanningProfiles(), projects, outcomes, routines, weekly_plans, feedback or MemoryFeedback())

@@ -11,6 +11,7 @@ import Projects from '../pages/Projects';
 import Week from '../pages/Week';
 import Settings from '../pages/Settings';
 import Today from '../pages/Today';
+import Onboarding from '../pages/Onboarding';
 import { CommitmentDraftCard } from '../components/intake/CommitmentDraftCard';
 import type { ActiveFocusSession, PlanResponse, TodayResponse } from '../types/api';
 
@@ -25,11 +26,15 @@ let savedProfile: Record<string, unknown> | null;
 let projectExists: boolean;
 let outcomeExists: boolean;
 let routines: Array<Record<string, unknown>>;
+let onboardingStatus: 'not_started' | 'in_progress' | 'completed' | 'skipped';
+let onboardingStep: number;
+let savedPreferences: Record<string, unknown> | null;
 
-const planningProfile = { timezone: 'Asia/Kolkata', available_weekdays: [0, 1, 2, 3, 4, 5], working_start_time: '09:30:00', working_end_time: '18:30:00', daily_focus_limit_minutes: 300, default_focus_duration_minutes: 45, minimum_transition_buffer_minutes: 10, minimum_daily_unscheduled_buffer_minutes: 60, protected_interval_start: '13:00:00', protected_interval_end: '14:00:00', quick_task_threshold_minutes: 5 };
+const preferences = { planning_style: 'balanced' as const, recommendation_frequency: 'normal' as const, approval_strictness: 'always_ask' as const, internal_write_automation_enabled: false, preferred_focus_durations: [25,45,60], routine_continuity_preference: 'gentle' as const, quick_task_mode: 'batch' as const, strategy_preferences: ['eisenhower_triage','task_batching','continuity_recovery','focus_interval','constrained_day','quick_action','time_blocking'], explanation_detail: 'standard' as const };
+const planningProfile = { timezone: 'Asia/Kolkata', available_weekdays: [0, 1, 2, 3, 4, 5], working_start_time: '09:30:00', working_end_time: '18:30:00', daily_focus_limit_minutes: 300, default_focus_duration_minutes: 45, minimum_transition_buffer_minutes: 10, minimum_daily_unscheduled_buffer_minutes: 60, protected_interval_start: '13:00:00', protected_interval_end: '14:00:00', quick_task_threshold_minutes: 5, onboarding_status: 'completed' as const, onboarding_step: 3, onboarding_completed_at: '2026-08-04T00:00:00Z', ...preferences };
 
 function todayData(): TodayResponse {
-  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60, project: { id: 'p1', title: 'ChronOS Production Release' }, outcome: { id: 'o1', title: 'Stable authentication and session handling' } }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { commitment_id: 'c1', title: 'Make the plan credible again', reason: 'The deadline is close.', options: ['Define a smaller next step'], requires_approval: true }, explanation: { constraints_considered: ['risk', 'deadline', 'calendar'], next_action_reason: 'Highest-ranked executable commitment.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true }, routines_due: [{ id: 'r1', title: 'Daily release review', preferred_time: '18:00', duration_minutes: 20, minimum_viable_version: '5-minute blocker review' }] };
+  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60, project: { id: 'p1', title: 'ChronOS Production Release' }, outcome: { id: 'o1', title: 'Stable authentication and session handling' } }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { recommendation_key: 'today:c1:calendar_disruption', commitment_id: 'c1', title: 'Adjust the plan calmly', what_changed: 'The current focus session no longer fits before the next meeting.', failure_mode: 'calendar_disruption', reason: 'The plan changed.', options: [{ id: 'shorter_block', title: 'Use the remaining short window', rationale: 'Protect only the time that fits.', tradeoff: 'Less progress now.', expected_impact: 'A smaller valid block', feasible: true, requires_approval: true }], recommended_option_id: 'shorter_block', requires_approval: true }, explanation: { detail: 'standard', constraints_considered: ['risk', 'deadline', 'calendar'], next_action_reason: 'Highest-ranked executable commitment.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true }, routines_due: [{ id: 'r1', title: 'Daily release review', preferred_time: '18:00', duration_minutes: 20, minimum_viable_version: '5-minute blocker review' }], focus_duration_options: [25,45,60], explanation_detail: 'standard' };
 }
 
 function planData(): PlanResponse {
@@ -48,8 +53,17 @@ beforeEach(() => {
   projectExists = false;
   outcomeExists = false;
   routines = [];
+  onboardingStatus = 'completed';
+  onboardingStep = 3;
+  savedPreferences = null;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith('/api/v1/settings/onboarding/skip')) { onboardingStatus = 'skipped'; return json({ ...planningProfile, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); }
+    if (url.endsWith('/api/v1/settings/onboarding/reopen')) { onboardingStatus = 'in_progress'; onboardingStep = 1; return json({ ...planningProfile, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); }
+    if (url.endsWith('/api/v1/settings/onboarding')) { if (init?.method === 'PUT') { const body = JSON.parse(String(init.body)); onboardingStatus = body.complete ? 'completed' : 'in_progress'; onboardingStep = body.onboarding_step; return json({ ...planningProfile, ...body, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); } return json({ ...planningProfile, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); }
+    if (url.endsWith('/api/v1/settings/preferences')) { if (init?.method === 'PUT') savedPreferences = JSON.parse(String(init.body)); return json(savedPreferences ?? preferences); }
+    if (url.endsWith('/api/v1/recommendations/feedback')) return json({ id: 'feedback-1', status: 'recorded' }, 201);
+    if (url.endsWith('/api/v1/rescue/choices')) return json({ id: 'feedback-2', status: 'recorded', plan_changed: false });
     if (url.endsWith('/api/v1/projects') && init?.method === 'POST') { projectExists = true; return json({ id: 'p1', title: 'ChronOS Production Release', description: '', status: 'active', colour: 'accent', outcome_count: 0, completed_outcome_count: 0, progress_percent: 0 }); }
     if (url.endsWith('/api/v1/projects')) return json({ projects: projectExists ? [{ id: 'p1', title: 'ChronOS Production Release', description: 'Ship safely', status: 'active', colour: 'accent', outcome_count: outcomeExists ? 1 : 0, completed_outcome_count: 0, progress_percent: 0, next_action: 'Authentication fix' }] : [] });
     if (url.endsWith('/api/v1/projects/p1/outcomes') && init?.method === 'POST') { outcomeExists = true; return json({ id: 'o1' }); }
@@ -78,10 +92,11 @@ beforeEach(() => {
     if (url.endsWith('/focus-blocks/start')) { active = { id: 'f1', commitment_id: 'c1', title: 'Authentication regression fix', status: 'active', planned_minutes: 25, elapsed_seconds: 0, remaining_seconds: 1500, started_at: new Date().toISOString() }; return json({ session: active }); }
     if (url.endsWith('/pause')) { active = { ...active!, status: 'paused', paused_at: new Date().toISOString() }; return json({ session: active }); }
     if (url.endsWith('/resume')) { active = { ...active!, status: 'active', paused_at: null }; return json({ session: active }); }
-    if (url.endsWith('/stuck')) return json({ focus_block_id: 'f1', options: ['Define a smaller next step', 'Identify missing information', 'Switch to a short setup action', 'Request a recovery suggestion'], recovery_available: true });
+    if (url.endsWith('/stuck')) return json({ focus_block_id: 'f1', failure_mode: 'calendar_disruption', recommended_option_id: 'stop_reflect', options: [{ id: 'smaller_step', title: 'Define a smaller next step', rationale: 'Make one visible result.', requires_approval: true }, { id: 'setup_action', title: 'Create a five-minute setup action', rationale: 'Lower restart friction.', requires_approval: true }, { id: 'recovery_plan', title: 'Request a recovery plan', rationale: 'Review checked options.', requires_approval: true }, { id: 'stop_reflect', title: 'Stop and reflect', rationale: 'Close honestly.', requires_approval: false }], recovery_available: true });
     if (url.endsWith('/complete')) { active = null; return json({ session: null, reflection: { id: 'r1' }, reflection_requested: false }); }
     if (url.endsWith('/skip')) { active = null; return json({ session: null, reflection_requested: true }); }
-    if (url.includes('/api/v1/rescue/')) return json({ status: 'plan_generated', proposals: [{ id: 'p1' }] });
+    if (url.includes('/api/v1/rescue/proposals/') && url.endsWith('/approve')) return json({ status: 'approved' });
+    if (url.includes('/api/v1/rescue/')) return json({ diagnosis: 'calendar_disruption', ai_used: false, proposals: [{ id: 'p1', payload_json: { rationale: 'Use a shorter block.', trade_off: 'Less progress now.', expected_impact: 'Avoids the meeting conflict.', feasible: true }, explanation: 'Checked.' }] });
     return json({});
   }));
 });
@@ -101,7 +116,7 @@ it('shows an accessible fallback while a lazy route loads', async () => {
 
 it('renders the consolidated Today response and one strategy recommendation', async () => {
   renderWithContext(<Today />, { path: '/today' });
-  expect(await screen.findByRole('heading', { name: 'Authentication regression fix' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Authentication regression fix' }, { timeout: 5000 })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Do now' })).toBeInTheDocument();
   expect(screen.getAllByText(/no automatic changes/i)).toHaveLength(1);
 });
@@ -130,8 +145,26 @@ it('shows the deterministic stuck options', async () => {
   active = { id: 'f1', commitment_id: 'c1', title: 'Fix', status: 'active', planned_minutes: 25, elapsed_seconds: 0, remaining_seconds: 1500, started_at: new Date().toISOString() };
   const user = userEvent.setup(); renderWithContext(<Today />);
   await user.click(await screen.findByRole('button', { name: /i’m stuck/i }));
-  expect(await screen.findByText('Identify missing information')).toBeInTheDocument();
-  expect(screen.getByText('Request a recovery suggestion')).toBeInTheDocument();
+  expect(await screen.findByText('Create a five-minute setup action')).toBeInTheDocument();
+  expect(screen.getByText('Request a recovery plan')).toBeInTheDocument();
+  expect(screen.getByText('Stop and reflect')).toBeInTheDocument();
+});
+
+it('completes onboarding in three short steps and persists the profile', async () => {
+  onboardingStatus = 'not_started'; const user = userEvent.setup(); renderWithContext(<Onboarding />, { path: '/onboarding' });
+  expect(await screen.findByLabelText('Step 1 of 3')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /save and continue/i }));
+  expect(await screen.findByLabelText('Step 2 of 3')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /save and continue/i }));
+  expect(await screen.findByLabelText('Step 3 of 3')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /finish setup/i }));
+  expect(onboardingStatus).toBe('completed');
+});
+
+it('allows onboarding to be skipped safely', async () => {
+  onboardingStatus = 'not_started'; const user = userEvent.setup(); renderWithContext(<Onboarding />, { path: '/onboarding' });
+  await user.click(await screen.findByRole('button', { name: /skip for now/i }));
+  expect(onboardingStatus).toBe('skipped');
 });
 
 it('creates a plan block and invalidates the plan', async () => {
@@ -186,6 +219,15 @@ it('persists personal availability and renders the selected timezone', async () 
   expect(savedProfile).toMatchObject({ timezone: 'Asia/Kolkata', daily_focus_limit_minutes: 240 });
 });
 
+it('persists personalization controls and keeps internal automation opt-in', async () => {
+  const user = userEvent.setup(); renderWithContext(<Settings />);
+  await user.selectOptions(await screen.findByLabelText('Planning style'), 'minimal');
+  expect(screen.getByRole('checkbox', { name: /enable reversible internal plan changes/i })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: /save personalization/i }));
+  expect(await screen.findByText('Personalization saved.')).toBeInTheDocument();
+  expect(savedPreferences).toMatchObject({ planning_style: 'minimal', internal_write_automation_enabled: false });
+});
+
 it('shows honest profile-only integration state', async () => {
   renderWithContext(<Settings />);
   expect(await screen.findByText('unavailable')).toBeInTheDocument();
@@ -207,7 +249,8 @@ it('renders Strategy Engine evidence, confidence, and automation boundary', asyn
 });
 
 it('shows compact plan transparency without hidden reasoning', async () => {
-  renderWithContext(<Today />);
+  const user = userEvent.setup(); renderWithContext(<Today />);
+  await user.click(await screen.findByText('Why this plan?'));
   expect(await screen.findByRole('heading', { name: 'Why this plan?' })).toBeInTheDocument();
   expect(screen.getByText('Deterministic')).toBeInTheDocument();
   expect(screen.getByText(/still requires your approval/i)).toBeInTheDocument();
@@ -234,9 +277,20 @@ it('keeps recovery and reflection contextual instead of primary navigation', asy
   const user = userEvent.setup(); renderWithContext(<Today />);
   const navigation = await screen.findByRole('navigation', { name: /primary/i });
   expect(navigation).not.toHaveTextContent('Recovery'); expect(navigation).not.toHaveTextContent('Reflection');
-  expect(await screen.findByRole('heading', { name: /make the plan credible again/i })).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: /prepare recovery recommendation/i }));
-  expect(await screen.findByText(/prepared for approval/i)).toBeInTheDocument();
+  await user.click(await screen.findByRole('button', { name: /review recovery/i }));
+  expect(screen.getByRole('dialog')).toHaveTextContent(/current focus session no longer fits/i);
+  expect(screen.getByText(/less progress now/i)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /review recovery options/i }));
+  expect(await screen.findByText(/deterministic recovery options/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /approve this option/i })).toBeInTheDocument();
+});
+
+it('dismisses recovery with Escape and does not mutate the plan', async () => {
+  const user = userEvent.setup(); renderWithContext(<Today />);
+  await user.click(await screen.findByRole('button', { name: /review recovery/i }));
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  await user.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
 it('renders the Projects empty state and creates a project', async () => {
@@ -310,7 +364,8 @@ it('allows optional Inbox project assignment and type classification', async () 
 it('keeps responsive primary navigation concise and functional', async () => {
   renderWithContext(<Today />, { path: '/today' });
   const navigation = await screen.findByRole('navigation', { name: /primary/i });
-  for (const label of ['Today', 'Inbox', 'Plan', 'Projects']) expect(within(navigation).getByText(label)).toBeInTheDocument();
+  for (const label of ['Today', 'Inbox', 'Plan']) expect(within(navigation).getByText(label)).toBeInTheDocument();
+  expect(within(navigation).queryByText('Projects')).not.toBeInTheDocument();
   expect(within(navigation).queryByText('Week')).not.toBeInTheDocument();
   expect(within(navigation).queryByText('Routines')).not.toBeInTheDocument();
 });

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CirclePause, CirclePlay, Flag, HelpCircle, Square } from 'lucide-react';
 import { apiFetch, apiUrl, getApiErrorMessage } from '../../lib/api';
-import type { ActiveFocusSession } from '../../types/api';
+import type { ActiveFocusSession, StuckOption } from '../../types/api';
 import { Surface } from '../ui/primitives';
 
 type NextAction = { commitment_id: string; title: string } | null;
@@ -18,11 +18,12 @@ function formatClock(seconds: number) {
   return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
 }
 
-export default function FocusPanel({ session, nextAction }: { session: ActiveFocusSession | null; nextAction: NextAction }) {
+export default function FocusPanel({ session, nextAction, durationOptions = [25, 45, 60] }: { session: ActiveFocusSession | null; nextAction: NextAction; durationOptions?: number[] }) {
   const queryClient = useQueryClient();
   const [duration, setDuration] = useState(25);
   const [tick, setTick] = useState(0);
-  const [stuckOptions, setStuckOptions] = useState<string[]>([]);
+  const [stuckOptions, setStuckOptions] = useState<StuckOption[]>([]);
+  const [recommendedStuck, setRecommendedStuck] = useState('');
   const [showReflection, setShowReflection] = useState(false);
   const [showStop, setShowStop] = useState(false);
   const [notice, setNotice] = useState('');
@@ -39,9 +40,20 @@ export default function FocusPanel({ session, nextAction }: { session: ActiveFoc
     mutationFn: ({ path, body }: { path: string; body?: unknown }) => mutateFocus(path, body),
     onSuccess: async () => { setTick(0); setStuckOptions([]); await refresh(); },
   });
+  const chooseStuck = async (option: StuckOption) => {
+    if (option.id === 'stop_reflect') { setShowReflection(true); return; }
+    if (option.id === 'recovery_plan') {
+      try { await mutateFocus(`/api/v1/rescue/${session?.commitment_id}/plan`); setNotice('Recovery options are ready for review. No plan data changed.'); }
+      catch (error) { setNotice(error instanceof Error ? error.message : 'Recovery is temporarily unavailable. Keep the smaller-step options above.'); }
+      return;
+    }
+    const response = await apiFetch(apiUrl('/api/v1/recommendations/feedback'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recommendation_type: 'focus_stuck', recommendation_key: `${session?.id}:${option.id}`, context_summary: { surface: 'focus', option_id: option.id, commitment_id: session?.commitment_id }, user_action: 'used' }) });
+    if (!response.ok) { setNotice('The option is still available, but your preference could not be saved.'); return; }
+    setNotice(`${option.title} selected. Review and approve any plan change before it is applied.`);
+  };
 
   if (!session) return <Surface className="p-5 sm:p-6">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-strong">Focus</p><h2 className="mt-1 text-lg font-semibold">Protect the next useful interval</h2><p className="mt-1 text-sm text-muted">Start with {nextAction?.title ?? 'your selected commitment'} and adjust honestly when reality changes.</p></div><div className="flex items-end gap-2"><label className="text-sm text-muted">Minutes<select aria-label="Focus duration" className="field mt-1 w-24" value={duration} onChange={event => setDuration(Number(event.target.value))}><option>25</option><option>45</option><option>60</option></select></label><button className="button-primary" disabled={!nextAction || mutation.isPending} onClick={() => nextAction && mutation.mutate({ path: '/api/v1/focus-blocks/start', body: { commitment_id: nextAction.commitment_id, duration_minutes: duration } })}>Start focus</button></div></div>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-strong">Focus</p><h2 className="mt-1 text-lg font-semibold">Protect the next useful interval</h2><p className="mt-1 text-sm text-muted">Start with {nextAction?.title ?? 'your selected commitment'} and adjust honestly when reality changes.</p></div><div className="flex items-end gap-2"><label className="text-sm text-muted">Minutes<select aria-label="Focus duration" className="field mt-1 w-24" value={durationOptions.includes(duration) ? duration : durationOptions[0]} onChange={event => setDuration(Number(event.target.value))}>{durationOptions.map(value => <option key={value}>{value}</option>)}</select></label><button className="button-primary" disabled={!nextAction || mutation.isPending} onClick={() => nextAction && mutation.mutate({ path: '/api/v1/focus-blocks/start', body: { commitment_id: nextAction.commitment_id, duration_minutes: durationOptions.includes(duration) ? duration : durationOptions[0] } })}>Start focus</button></div></div>
     {mutation.isError && <p role="alert" className="mt-4 text-sm text-danger">{mutation.error.message}</p>}{notice && <p role="status" className="mt-4 text-sm text-success">{notice}</p>}
   </Surface>;
 
@@ -50,8 +62,8 @@ export default function FocusPanel({ session, nextAction }: { session: ActiveFoc
   </form></Surface>;
 
   return <Surface className="p-5 sm:p-6"><div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-strong">{session.status === 'paused' ? 'Focus paused' : 'Focus in progress'}</p><h2 className="mt-1 text-xl font-semibold">{session.title}</h2><p className="mt-2 text-sm text-muted">Planned for {session.planned_minutes} minutes</p></div><p aria-label={`${remaining} seconds remaining`} className="font-mono text-4xl font-semibold tabular-nums">{formatClock(remaining)}</p></div>
-    <div className="mt-5 flex flex-wrap gap-2">{session.status === 'active' ? <button className="button-secondary" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/api/v1/focus-blocks/${session.id}/pause` })}><CirclePause className="mr-2 h-4 w-4" />Pause</button> : <button className="button-primary" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/api/v1/focus-blocks/${session.id}/resume` })}><CirclePlay className="mr-2 h-4 w-4" />Resume</button>}<button className="button-secondary" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/api/v1/focus-blocks/${session.id}/stuck` }, { onSuccess: data => setStuckOptions(data.options) })}><HelpCircle className="mr-2 h-4 w-4" />I’m stuck</button><button className="button-secondary" onClick={() => setShowReflection(true)}><Flag className="mr-2 h-4 w-4" />Finish</button><button className="button-secondary" onClick={() => setShowStop(true)}><Square className="mr-2 h-4 w-4" />Stop</button></div>
-    {stuckOptions.length > 0 && <div className="mt-5 rounded-xl bg-surface-subtle p-4"><h3 className="font-medium">Choose the smallest useful adjustment</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">{stuckOptions.map(option => <li key={option}>{option}</li>)}</ul></div>}
+    <div className="mt-5 flex flex-wrap gap-2">{session.status === 'active' ? <button className="button-secondary" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/api/v1/focus-blocks/${session.id}/pause` })}><CirclePause className="mr-2 h-4 w-4" />Pause</button> : <button className="button-primary" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/api/v1/focus-blocks/${session.id}/resume` })}><CirclePlay className="mr-2 h-4 w-4" />Resume</button>}<button className="button-secondary" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/api/v1/focus-blocks/${session.id}/stuck` }, { onSuccess: data => { setStuckOptions(data.options); setRecommendedStuck(data.recommended_option_id); } })}><HelpCircle className="mr-2 h-4 w-4" />I’m stuck</button><button className="button-secondary" onClick={() => setShowReflection(true)}><Flag className="mr-2 h-4 w-4" />Finish</button><button className="button-secondary" onClick={() => setShowStop(true)}><Square className="mr-2 h-4 w-4" />Stop</button></div>
+    {stuckOptions.length > 0 && <div className="mt-5 rounded-xl bg-surface-subtle p-4"><h3 className="font-medium">Choose the smallest useful adjustment</h3><div className="mt-3 grid gap-2 sm:grid-cols-2">{stuckOptions.map(option => <button className="rounded-xl border border-line bg-surface p-3 text-left text-sm hover:border-accent" key={option.id} onClick={() => void chooseStuck(option)}><span className="font-medium text-ink">{option.title}{option.id === recommendedStuck && <span className="ml-2 text-xs text-accent-strong">Recommended</span>}</span><span className="mt-1 block text-xs text-muted">{option.rationale}</span></button>)}</div><p className="mt-3 text-xs text-muted">Suggestions do not alter your plan without approval.</p></div>}
     {showStop && <form className="mt-5 flex flex-col gap-3 rounded-xl border border-line p-4 sm:flex-row sm:items-end" onSubmit={event => { event.preventDefault(); const reason = String(new FormData(event.currentTarget).get('reason') || ''); mutation.mutate({ path: `/api/v1/focus-blocks/${session.id}/skip`, body: { reason } }, { onSuccess: () => { setShowStop(false); setNotice('Focus stopped. Add a reflection when you are ready.'); } }); }}><label className="label flex-1">Why are you stopping?<input required minLength={2} name="reason" className="field mt-1" /></label><button className="button-primary" disabled={mutation.isPending}>Stop session</button></form>}
     {mutation.isError && <p role="alert" className="mt-4 text-sm text-danger">{mutation.error.message}</p>}{notice && <p role="status" className="mt-4 text-sm text-success">{notice}</p>}
   </Surface>;

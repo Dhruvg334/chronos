@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import time
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -18,6 +19,18 @@ class PlanningProfile(BaseModel):
     protected_interval_start: time | None = None
     protected_interval_end: time | None = None
     quick_task_threshold_minutes: int = Field(default=5, ge=1, le=60)
+    onboarding_status: Literal["not_started", "in_progress", "completed", "skipped"] = "not_started"
+    onboarding_step: int = Field(default=1, ge=1, le=3)
+    onboarding_completed_at: str | None = None
+    planning_style: Literal["guided", "balanced", "minimal"] = "balanced"
+    recommendation_frequency: Literal["low", "normal", "high"] = "normal"
+    approval_strictness: Literal["always_ask", "allow_reversible"] = "always_ask"
+    internal_write_automation_enabled: bool = False
+    preferred_focus_durations: list[int] = Field(default_factory=lambda: [25, 45, 60], min_length=1, max_length=5)
+    routine_continuity_preference: Literal["gentle", "standard", "structured"] = "gentle"
+    quick_task_mode: Literal["immediate", "batch"] = "batch"
+    strategy_preferences: list[str] = Field(default_factory=lambda: ["eisenhower_triage", "task_batching", "continuity_recovery", "focus_interval", "constrained_day", "quick_action", "time_blocking"])
+    explanation_detail: Literal["brief", "standard", "detailed"] = "standard"
 
     @field_validator("timezone")
     @classmethod
@@ -48,6 +61,11 @@ class PlanningProfile(BaseModel):
             assert self.protected_interval_start is not None and self.protected_interval_end is not None
             if not self.working_start_time <= self.protected_interval_start < self.protected_interval_end <= self.working_end_time:
                 raise ValueError("The protected interval must fit inside working hours.")
+        allowed_durations = {15, 20, 25, 30, 45, 60, 90, 120, 180}
+        if len(set(self.preferred_focus_durations)) != len(self.preferred_focus_durations) or any(value not in allowed_durations for value in self.preferred_focus_durations):
+            raise ValueError("Preferred focus durations must be unique supported minute values.")
+        if self.internal_write_automation_enabled and self.approval_strictness != "allow_reversible":
+            raise ValueError("Enable reversible internal changes before enabling internal-write automation.")
         return self
 
 

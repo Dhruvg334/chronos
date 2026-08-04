@@ -17,7 +17,7 @@ from app.schemas.core import (
     RecoveryView,
     TodayResponse,
 )
-from app.strategies.models import StrategyContext
+from app.strategies.models import StrategyContext, StrategyId, StrategyPreferences
 from app.strategies.selector import StrategySelector
 from app.schemas.planning_profile import PlanningProfile
 from app.services.capacity_engine import CapacityEngine, CapacityResult
@@ -221,19 +221,76 @@ class CoreJourneyService:
                 project={"id": str(project["id"]), "title": project["title"]} if project else None,
                 outcome={"id": str(outcome["id"]), "title": outcome["title"]} if outcome else None,
             )
+        plan_limit = 3 if profile.planning_style == "minimal" else 5
         ordered = [
             PlanItemView(id=str(row["id"]), kind="commitment", title=str(row["title"]), commitment_id=str(row["id"]), status=str(row.get("risk_level") or row.get("status") or "active"))
-            for row in ranked[:6]
+            for row in ranked[:plan_limit]
         ]
         attention = sum(1 for row in ranked if row.get("risk_level") in {"at_risk", "critical", "rescue_required"})
-        recommendation = self.selector.recommend(self.strategy_context(user_id, ranked, blocks, events, active, capacity, profile))
+        enabled = {StrategyId(value) for value in profile.strategy_preferences if value in {item.value for item in StrategyId}}
+        recommendation = self.selector.recommend(
+            self.strategy_context(user_id, ranked, blocks, events, active, capacity, profile),
+            StrategyPreferences(enabled=enabled, quick_task_threshold_minutes=min(profile.quick_task_threshold_minutes, 15), focus_minutes=profile.default_focus_duration_minutes, quick_task_mode=profile.quick_task_mode),
+        )
+        high_value_only = profile.planning_style == "minimal" or profile.recommendation_frequency == "low"
+        if recommendation and high_value_only and not (recommendation.confidence == "high" and (attention > 0 or capacity.over_capacity_minutes > 0)):
+            recommendation = None
+        elif recommendation and profile.recommendation_frequency == "normal" and recommendation.confidence == "medium" and attention == 0:
+            recommendation = None
+        if recommendation:
+            prior = next((row for row in self.repositories.feedback.list_for_user(user_id, 30) if row.get("recommendation_type") == "strategy" and row.get("recommendation_key") == recommendation.strategy.value), None)
+            if prior and prior.get("user_action") == "dismissed":
+                recommendation = None
         recovery = None
-        if attention and ranked:
+        failure_mode = None
+        what_changed = None
+        if ranked and capacity.over_capacity_minutes > 0:
+            failure_mode, what_changed = "overload", f"Today exceeds available capacity by {capacity.over_capacity_minutes} minutes."
+        elif active:
+            active_state = focus_view(active, now=current)
+            next_event = min((parse_datetime(row["start_at"]) for row in events if parse_datetime(row["start_at"]) > current), default=None)
+            if next_event and int((next_event - current).total_seconds()) < active_state.remaining_seconds + profile.minimum_transition_buffer_minutes * 60:
+                failure_mode, what_changed = "calendar_disruption", "The current focus session no longer fits before the next calendar event."
+        if not failure_mode and ranked and ranked[0].get("status") == "blocked":
+            failure_mode, what_changed = "dependency_blocked", "The next important outcome is waiting on a dependency."
+        if not failure_mode and ranked and (not ranked[0].get("description") or float(ranked[0].get("confidence_score") or 0) < .6):
+            failure_mode, what_changed = "ambiguous_next_action", "The next action is not yet specific enough to execute confidently."
+        if not failure_mode and any(row.get("status") in {"skipped", "scheduled"} and parse_datetime(row["end_at"]) < current for row in blocks):
+            failure_mode, what_changed = "missed_focus_block", "A planned focus block passed without being completed."
+        if not failure_mode and attention and ranked:
+            failure_mode, what_changed = "overload", f"{ranked[0]['title']} is at risk within the current plan."
+        recovery_threshold_met = bool(failure_mode and ranked)
+        if profile.planning_style == "minimal" and failure_mode not in {"overload", "calendar_disruption", "dependency_blocked"}:
+            recovery_threshold_met = False
+        elif profile.planning_style != "guided" and failure_mode in {"ambiguous_next_action", "missed_focus_block"} and attention == 0:
+            recovery_threshold_met = False
+        if recovery_threshold_met and ranked:
+            option_sets = {
+                "calendar_disruption": (
+                    {"id": "shorter_block", "title": "Use the remaining short window", "rationale": "Protect only the time that still fits.", "tradeoff": "Less progress now, without running into the meeting.", "expected_impact": "A smaller valid block", "feasible": True, "requires_approval": True},
+                    {"id": "reschedule", "title": "Reschedule the remaining work", "rationale": "Move the unfinished portion to a conflict-free interval.", "tradeoff": "Another item may need to move.", "expected_impact": "Forty minutes preserved later", "feasible": True, "requires_approval": True},
+                    {"id": "stop_reflect", "title": "Stop and reflect", "rationale": "Close the session honestly before the interruption.", "tradeoff": "The work remains unfinished.", "expected_impact": "Clean context for replanning", "feasible": True, "requires_approval": True},
+                ),
+                "dependency_blocked": (
+                    {"id": "missing_information", "title": "Identify what is missing", "rationale": "Make the dependency explicit before scheduling execution.", "tradeoff": "The outcome stays paused meanwhile.", "expected_impact": "A clear unblock condition", "feasible": True, "requires_approval": True},
+                    {"id": "lower_effort", "title": "Switch to executable work", "rationale": "Use available capacity without pretending blocked work can proceed.", "tradeoff": "The blocked outcome waits.", "expected_impact": "Useful progress elsewhere", "feasible": True, "requires_approval": True},
+                ),
+            }
+            default_options = (
+                {"id": "smaller_step", "title": "Define a smaller next step", "rationale": "Reduce the immediate scope to one executable result.", "tradeoff": "The full outcome moves later.", "expected_impact": "Lower start friction", "feasible": True, "requires_approval": True},
+                {"id": "shorter_block", "title": "Protect a shorter block", "rationale": "Fit progress into current capacity.", "tradeoff": "Less work completes today.", "expected_impact": "A credible plan", "feasible": True, "requires_approval": True},
+                {"id": "defer", "title": "Defer lower-priority work", "rationale": "Make room for the most important outcome.", "tradeoff": "Some work moves explicitly.", "expected_impact": "Reduced overload", "feasible": True, "requires_approval": True},
+            )
+            options = option_sets.get(failure_mode, default_options)
             recovery = RecoveryView(
+                recommendation_key=f"today:{ranked[0]['id']}:{failure_mode}",
                 commitment_id=str(ranked[0]["id"]),
-                title="Make the plan credible again",
+                title="Adjust the plan calmly",
+                what_changed=str(what_changed),
+                failure_mode=str(failure_mode),
                 reason=f"{ranked[0]['title']} needs a smaller or better-protected path.",
-                options=("Define a smaller next step", "Protect a short focus block", "Defer lower-priority work"),
+                options=options,
+                recommended_option_id=options[0]["id"],
             )
         status = "empty" if not ranked else "attention" if attention else "clear"
         persisted_occurrences = {(str(item["routine_id"]), str(item["occurrence_date"])): item for item in self.repositories.routines.list_occurrences(user_id, day_start, day_end)}
@@ -243,6 +300,7 @@ class CoreJourneyService:
                 occurrence = persisted_occurrences.get((str(routine["id"]), local_current.date().isoformat()))
                 if not occurrence or occurrence.get("status") == "due":
                     routines_due.append({"id": str(routine["id"]), "title": routine["title"], "preferred_time": str(routine.get("preferred_time") or "")[:5] or None, "duration_minutes": routine["estimated_duration_minutes"], "minimum_viable_version": routine["minimum_viable_version"]})
+        explanation_detail = "detailed" if profile.planning_style == "guided" and profile.explanation_detail == "standard" else "brief" if profile.planning_style == "minimal" and profile.explanation_detail == "standard" else profile.explanation_detail
         return TodayResponse(
             status=status,
             status_message="Nothing needs scheduling yet." if status == "empty" else "One decision can make the plan workable." if status == "attention" else "The plan is workable.",
@@ -254,14 +312,17 @@ class CoreJourneyService:
             active_focus_session=focus_view(active, now=current) if active else None,
             recovery=recovery,
             explanation={
-                "constraints_considered": ["risk", "deadline", "importance", "calendar", "available capacity"],
+                "detail": explanation_detail,
+                "constraints_considered": [] if explanation_detail == "brief" else ["risk", "deadline", "importance", "calendar", "available capacity"],
                 "next_action_reason": "The next action is the highest-ranked executable commitment after deterministic checks." if next_action else "No executable commitment is available.",
-                "deferred": [row["title"] for row in ranked[1:4]],
-                "changed": "Loading Today did not change the plan.",
+                "deferred": [row["title"] for row in ranked[1:(2 if explanation_detail == "standard" else 4)]] if explanation_detail != "brief" else [],
+                "changed": "Loading Today did not change the plan." if explanation_detail != "brief" else "",
                 "ai_used": False,
                 "requires_approval": True,
             },
-            routines_due=routines_due[:6],
+            routines_due=routines_due[:3],
+            focus_duration_options=profile.preferred_focus_durations,
+            explanation_detail=explanation_detail,
         )
 
     def plan(self, user_id: str, start_at: datetime, end_at: datetime) -> PlanResponse:

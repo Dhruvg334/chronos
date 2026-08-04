@@ -33,6 +33,7 @@ class StrategyPreferences(BaseModel):
     quick_task_threshold_minutes: int = Field(2, ge=1, le=15)
     focus_minutes: int = Field(45, ge=10, le=180)
     break_minutes: int = Field(10, ge=1, le=60)
+    quick_task_mode: Literal["immediate", "batch"] = "batch"
 
 
 class StrategyContext(BaseModel):

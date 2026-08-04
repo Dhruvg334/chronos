@@ -9,6 +9,7 @@ import {
 } from "../components/ui/primitives";
 import { apiFetch, apiUrl, getApiErrorMessage } from "../lib/api";
 import type { IntegrationStatus, PlanningProfile } from "../types/api";
+import { PreferenceSettings } from "../components/settings/PreferenceSettings";
 
 const DAYS = [
   "Monday",
@@ -407,6 +408,7 @@ export default function Settings() {
             approval; no external write automation is enabled.
           </p>
         </Surface>
+        <PreferenceSettings />
       </div>
     </AppShell>
   );

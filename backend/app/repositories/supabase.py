@@ -302,7 +302,11 @@ PLANNING_PROFILE_COLUMNS = (
     "timezone,available_weekdays,working_start_time,working_end_time,"
     "daily_focus_limit_minutes,default_focus_duration_minutes,"
     "minimum_transition_buffer_minutes,minimum_daily_unscheduled_buffer_minutes,"
-    "protected_interval_start,protected_interval_end,quick_task_threshold_minutes,updated_at"
+    "protected_interval_start,protected_interval_end,quick_task_threshold_minutes,"
+    "onboarding_status,onboarding_step,onboarding_completed_at,planning_style,"
+    "recommendation_frequency,approval_strictness,internal_write_automation_enabled,"
+    "preferred_focus_durations,routine_continuity_preference,quick_task_mode,"
+    "strategy_preferences,explanation_detail,updated_at"
 )
 
 PLANNING_PROFILE_DEFAULTS: dict[str, Any] = {
@@ -345,6 +349,22 @@ class SupabasePlanningProfileRepository(_BaseRepository):
 
     def reset(self, user_id: str) -> dict[str, Any]:
         return self.update(user_id, PLANNING_PROFILE_DEFAULTS.copy())
+
+
+class SupabaseRecommendationFeedbackRepository(_BaseRepository):
+    def create(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("recommendation_feedback").insert({**data, "user_id": user_id}).execute().data or []
+            if not rows: raise RuntimeError("insert returned no row")
+            return rows[0]
+        except Exception as exc:
+            raise self._failure("recommendation_feedback.create", exc) from exc
+
+    def list_for_user(self, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        try:
+            return self.client.table("recommendation_feedback").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit).execute().data or []
+        except Exception as exc:
+            raise self._failure("recommendation_feedback.list", exc) from exc
 
 
 class _OwnedCrudRepository(_BaseRepository):
@@ -455,4 +475,5 @@ def create_repository_set(client: Client) -> RepositorySet:
         outcomes=SupabaseOutcomesRepository(client),
         routines=SupabaseRoutinesRepository(client),
         weekly_plans=SupabaseWeeklyPlansRepository(client),
+        feedback=SupabaseRecommendationFeedbackRepository(client),
     )

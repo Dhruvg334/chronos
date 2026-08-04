@@ -15,8 +15,9 @@ class StrategySelector:
         if context.recurring and context.missed_yesterday and context.recent_completions > 0 and enabled(StrategyId.CONTINUITY):
             return StrategyRecommendation(strategy=StrategyId.CONTINUITY, title="Restart the routine gently", why="A recent miss follows an established pattern.", evidence=(f"{context.recent_completions} recent completions", "missed yesterday"), action="Do the smallest useful version today, then return to the normal cadence.", tradeoff="A smaller session advances less work today but lowers restart friction.", confidence="high")
 
-        if (context.deep_work_active and context.similar_quick_tasks >= 2 or context.weekly_planning and context.similar_quick_tasks >= 3) and enabled(StrategyId.BATCHING):
-            evidence = (f"{context.similar_quick_tasks} similar tasks", "weekly planning horizon") if context.weekly_planning else (f"{context.similar_quick_tasks} similar tasks", "deep-work block active")
+        batching_preferred = prefs.quick_task_mode == "batch" and context.similar_quick_tasks >= 2
+        if (context.deep_work_active and context.similar_quick_tasks >= 2 or context.weekly_planning and context.similar_quick_tasks >= 3 or batching_preferred) and enabled(StrategyId.BATCHING):
+            evidence = (f"{context.similar_quick_tasks} similar tasks", "weekly planning horizon") if context.weekly_planning else (f"{context.similar_quick_tasks} similar tasks", "batching preference" if batching_preferred and not context.deep_work_active else "deep-work block active")
             return StrategyRecommendation(strategy=StrategyId.BATCHING, title="Batch the quick tasks", why="Several short tasks can share one bounded context.", evidence=evidence, action="Collect them into one short batch without interrupting protected focus.", tradeoff="Individual tasks wait until the batch, reducing switching elsewhere.", confidence="high")
 
         if context.estimate_minutes is not None and context.estimate_minutes <= prefs.quick_task_threshold_minutes and not context.deep_work_active and enabled(StrategyId.QUICK_ACTION):

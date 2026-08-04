@@ -15,14 +15,6 @@ from app.services.core_journey import focus_view, observed_risk, parse_datetime
 
 router = APIRouter()
 
-STUCK_OPTIONS = (
-    "Define a smaller next step",
-    "Identify missing information",
-    "Switch to a short setup action",
-    "Request a recovery suggestion",
-)
-
-
 class CreateFocusBlockRequest(BaseModel):
     commitment_id: str
     title: str
@@ -149,7 +141,28 @@ async def focus_stuck(block_id: str, user_id: str = Depends(get_current_user), r
     block = _get_block(repositories, user_id, block_id)
     if block.get("status") not in {"active", "paused"}:
         raise ChronosError(ErrorCode.CONFLICT, "Stuck guidance is available during an active focus session.")
-    return StuckResponse(focus_block_id=block_id, options=STUCK_OPTIONS, recovery_available=True)
+    current = datetime.now(timezone.utc)
+    session = focus_view(block, now=current)
+    upcoming = repositories.planning.list_calendar_events(user_id, current, current + timedelta(minutes=max(180, session.remaining_seconds // 60 + 30)))
+    next_event = min((parse_datetime(row["start_at"]) for row in upcoming if parse_datetime(row["start_at"]) > current), default=None)
+    calendar_disrupted = bool(next_event and int((next_event - current).total_seconds()) < session.remaining_seconds)
+    commitment = repositories.commitments.get_for_user(user_id, str(block.get("commitment_id"))) or {}
+    alternatives = [row for row in repositories.commitments.list_for_user(user_id) if str(row.get("id")) != str(block.get("commitment_id")) and row.get("status") not in {"completed", "blocked", "archived"}]
+    options = [
+        {"id": "smaller_step", "title": "Define a smaller next step", "rationale": "Turn the current work into one visible result.", "requires_approval": True},
+        {"id": "missing_information", "title": "Identify missing information", "rationale": "Name the uncertainty or dependency before continuing.", "requires_approval": True},
+        {"id": "setup_action", "title": "Create a five-minute setup action", "rationale": "Lower the cost of restarting without pretending the task is complete.", "duration_minutes": 5, "requires_approval": True},
+    ]
+    if alternatives:
+        lower = min(alternatives, key=lambda row: int(row.get("estimated_minutes") or 10_000))
+        options.append({"id": "lower_effort", "title": f"Switch to {lower['title']}", "rationale": "Use a lower-effort executable task for the available window.", "commitment_id": str(lower["id"]), "requires_approval": True})
+    options.extend([
+        {"id": "recovery_plan", "title": "Request a recovery plan", "rationale": "Review conflict-checked options before changing the plan.", "requires_approval": True},
+        {"id": "stop_reflect", "title": "Stop and reflect", "rationale": "Close the session and record what blocked progress.", "requires_approval": False},
+    ])
+    failure_mode = "calendar_disruption" if calendar_disrupted else "ambiguity" if not commitment.get("description") else "start_friction"
+    recommended = "stop_reflect" if calendar_disrupted else "missing_information" if failure_mode == "ambiguity" else "smaller_step"
+    return StuckResponse(focus_block_id=block_id, failure_mode=failure_mode, options=tuple(options[:6]), recommended_option_id=recommended, recovery_available=True)
 
 
 @router.post("/{block_id}/complete", response_model=FocusSessionResponse)
