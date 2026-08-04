@@ -3,11 +3,12 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.core.config import settings
 from app.core.errors import ChronosError, HTTP_STATUS_BY_ERROR
 from app.core.observability import log_event, request_context_middleware, request_id_context
 from app.services.readiness import readiness_report
-from app.api.v1 import auth, commitments, calendar, context, drift, rescue, reflection, agent, intake, google, integrations, mcp, scheduling, command, demo, today, plan, projects, routines, week, recommendations, settings as settings_api
+from app.api.v1 import auth, commitments, calendar, context, rescue, reflection, intake, google, integrations, mcp, today, plan, projects, routines, week, recommendations, operations, workflows, settings as settings_api
 
 app = FastAPI(
     title="ChronOS API",
@@ -24,14 +25,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.BACKEND_ALLOWED_HOSTS)
 app.middleware("http")(request_context_middleware)
 
 @app.exception_handler(ChronosError)
 async def chronos_error_handler(request: Request, exc: ChronosError):
-    log_event(logging.getLogger("chronos.error"), logging.WARNING, "handled_error", code=exc.code, path=request.url.path, context=exc.context)
+    log_event(logging.getLogger("chronos.error"), logging.WARNING, "handled_error", code=exc.code, failure_code=exc.failure_code, path=request.url.path, context=exc.context)
+    retry_after = exc.context.get("retry_after_seconds")
+    detail = {"code": exc.code, "failure_code": exc.failure_code, "message": exc.public_message, "request_id": request_id_context.get()}
+    if retry_after is not None:
+        detail["retry_after_seconds"] = retry_after
     return JSONResponse(
         status_code=HTTP_STATUS_BY_ERROR[exc.code],
-        content={"error": {"code": exc.code, "message": exc.public_message, "request_id": request_id_context.get()}},
+        content={"error": detail},
     )
 
 
@@ -54,13 +60,8 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(commitments.router, prefix="/api/v1/commitments", tags=["commitments"])
 app.include_router(calendar.router, prefix="/api/v1/calendar", tags=["calendar"])
 app.include_router(google.router, prefix="/api/v1/google", tags=["google"])
-app.include_router(drift.router, prefix="/api/v1/drift", tags=["drift"])
 app.include_router(rescue.router, prefix="/api/v1/rescue", tags=["rescue"])
 app.include_router(reflection.router, prefix="/api/v1/reflection", tags=["reflection"])
-app.include_router(agent.router, prefix="/api/v1/agent", tags=["agent"])
-app.include_router(scheduling.router, prefix="/api/v1/scheduling", tags=["scheduling"])
-app.include_router(command.router, prefix="/api/v1/command", tags=["command"])
-app.include_router(demo.router, prefix="/api/v1/demo", tags=["demo"])
 app.include_router(today.router, prefix="/api/v1/today", tags=["today"])
 app.include_router(plan.router, prefix="/api/v1/plan", tags=["plan"])
 app.include_router(projects.router, prefix="/api/v1/projects", tags=["projects"])
@@ -71,6 +72,8 @@ app.include_router(recommendations.router, prefix="/api/v1/recommendations", tag
 app.include_router(context.router, prefix="/api/v1/context", tags=["context"])
 app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["integrations"])
 app.include_router(mcp.router, prefix="/api/v1/mcp", tags=["mcp"])
+app.include_router(operations.router, prefix="/api/v1/operations", tags=["operations"])
+app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["workflows"])
 from app.api.v1.focus_blocks import router as fb_router
 app.include_router(fb_router, prefix="/api/v1/focus-blocks", tags=["focus_blocks"])
 app.include_router(intake.router)

@@ -6,6 +6,7 @@ from pathlib import Path
 from app.schemas.intake import IntakeResponse
 from app.workflows.adaptive_recovery import diagnose_recovery
 from app.workflows.intake import validate_intake_output
+from evals.datasets.hardening_v1 import DATASETS
 
 ROOT = Path(__file__).parent
 
@@ -49,7 +50,7 @@ def evaluate():
         unsupported_errors += int(kept != case["expected_preserved"])
     tools = load("tool_selection.json")
     tool_correct = sum((case["selected"] in case["allowed"]) == case["expected_valid"] for case in tools)
-    return {
+    metrics = {
         "dataset_sizes": {"intake": len(intake), "clarification": len(clarification), "planning": len(planning), "recovery": len(recovery), "unsupported_claims": len(unsupported), "tool_selection": len(tools)},
         "schema_valid_rate": valid_schema / len(intake),
         "deadline_extraction_accuracy": deadline_correct / len(intake),
@@ -60,6 +61,15 @@ def evaluate():
         "unsupported_claim_rate": unsupported_errors / len(unsupported),
         "tool_selection_accuracy": tool_correct / len(tools),
     }
+    metrics["expanded_dataset_sizes"] = {name: len(dataset.cases) for name, dataset in DATASETS.items()}
+    metrics["metric_denominators"] = {
+        "schema_valid_rate": len(intake), "deadline_extraction_accuracy": len(intake),
+        "clarification_precision": max(1, tp + fp), "valid_plan_rate": len(planning),
+        "overlap_violation_rate": max(1, len(accepted)), "recovery_diagnosis_accuracy": len(recovery),
+        "unsupported_claim_rate": len(unsupported), "tool_selection_accuracy": len(tools),
+    }
+    metrics["dataset_classification"] = "manually curated synthetic; no production-derived cases"
+    return metrics
 
 
 if __name__ == "__main__":

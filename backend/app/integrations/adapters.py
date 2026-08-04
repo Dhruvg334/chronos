@@ -6,6 +6,7 @@ from typing import Any
 
 from app.integrations.base import ReadOnlyConnectorBase, allow_metadata, checksum
 from app.integrations.contracts import ConnectorCapability, NormalizedIntegrationItem, SyncPage
+from app.core.security import sanitize_external_url
 
 
 def _trim_email(text: str) -> str:
@@ -30,7 +31,7 @@ class FixtureReadConnector(ReadOnlyConnectorBase):
 
     def normalize(self, raw: dict[str, Any]) -> NormalizedIntegrationItem:
         safe = {key: raw.get(key) for key in ("id", "title", "summary", "url", "occurred_at", "due_at", "deleted_at")}
-        return NormalizedIntegrationItem(external_id=str(raw["id"]), item_type=self.item_type, title=str(raw.get("title") or "Untitled"), content_summary=str(raw.get("summary") or "")[:4000], source_url=raw.get("url"), occurred_at=raw.get("occurred_at"), due_at=raw.get("due_at"), checksum=checksum(safe), metadata=allow_metadata(raw), deleted_at=raw.get("deleted_at"))
+        return NormalizedIntegrationItem(external_id=str(raw["id"]), item_type=self.item_type, title=str(raw.get("title") or "Untitled"), content_summary=str(raw.get("summary") or "")[:4000], source_url=sanitize_external_url(raw.get("url")), occurred_at=raw.get("occurred_at"), due_at=raw.get("due_at"), checksum=checksum(safe), metadata=allow_metadata(raw), deleted_at=raw.get("deleted_at"))
 
     def sync(self, user_id: str, cursor: str | None, *, limit: int = 100) -> SyncPage:
         if not self.configured(): raise RuntimeError("provider unavailable")

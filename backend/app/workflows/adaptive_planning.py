@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from app.core.errors import ChronosError, ErrorCode
 from app.models.gateway import ModelGateway, ModelRequest
+from app.core.versions import DAILY_PLANNING_PROMPT_VERSION, SCHEMA_VERSION
 from app.embeddings.gateway import EmbeddingGateway
 from app.repositories.protocols import RepositorySet
 from app.schemas.adaptive import (
@@ -149,6 +150,7 @@ class AdaptivePlanningWorkflow:
                 model_role="reasoning",
                 temperature=0,
                 metadata={"workflow_id": context.workflow_id},
+                prompt_version=DAILY_PLANNING_PROMPT_VERSION, schema_version=SCHEMA_VERSION,
             )
             response = await self.runner.run_step(
                 context,
@@ -158,6 +160,9 @@ class AdaptivePlanningWorkflow:
                 provider=self.gateway.metadata().get("provider"),
                 model=self.gateway.metadata().get("reasoning_model") or self.gateway.metadata().get("model"),
                 request_units=2,
+                prompt_version=request.prompt_version,
+                schema_version=request.schema_version,
+                temperature=request.temperature,
             )
             profile = PlanningProfile.model_validate(self.repositories.planning_profiles.get(user_id))
             events = self.repositories.planning.list_calendar_events(user_id, start_at, end_at)

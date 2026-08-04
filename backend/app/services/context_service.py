@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.errors import ChronosError, ErrorCode
 from app.embeddings.gateway import EmbeddingGateway
 from app.repositories.protocols import RepositorySet
+from app.core.observability import observe_latency, record_dependency_state
 from app.schemas.context import Citation, ContextPackView, MemoryCreate, MemoryPatch, MemoryProposal
 
 _SPACE = re.compile(r"\s+")
@@ -158,8 +159,11 @@ class KnowledgeService:
         checksum = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
         pieces = self._chunks(content)
         try:
-            embedded = await self.embeddings.embed(pieces)
+            with observe_latency("embedding_duration_ms", operation="ingestion"):
+                embedded = await self.embeddings.embed(pieces)
+            record_dependency_state("embedding_provider", "reachable")
         except ChronosError:
+            record_dependency_state("embedding_provider", "unavailable")
             self._record_failed(user_id, title, source_type, project_id, checksum, metadata, "embedding_unavailable")
             raise
         if embedded.dimensions != settings.EMBEDDING_DIMENSIONS or len(embedded.vectors) != len(pieces):
@@ -211,10 +215,13 @@ class RetrievalService:
 
     async def retrieve(self, user_id: str, query: str, *, project_id: str | None = None, limit: int = 6) -> tuple[list[Citation], bool]:
         try:
-            result = await self.embeddings.embed([normalize_text(query)])
+            with observe_latency("retrieval_duration_ms", operation="hybrid"):
+                result = await self.embeddings.embed([normalize_text(query)])
+            record_dependency_state("embedding_provider", "reachable")
             if result.dimensions != settings.EMBEDDING_DIMENSIONS: raise ValueError("dimension mismatch")
             rows = self.repositories.knowledge.retrieve(user_id, query, result.vectors[0], project_id, limit)
         except Exception:
+            record_dependency_state("embedding_provider", "unavailable")
             return [], False
         citations = [Citation(source_id=str(row["source_id"]), source_title=row["title"], source_type=row["source_type"],
             excerpt=row["excerpt"], score=float(row.get("score") or 0), retrieval_method="hybrid",

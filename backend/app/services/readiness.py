@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from datetime import datetime, timezone
 from typing import Any
 
 from app.core.config import settings
 from app.core.container import container
-from app.core.observability import log_event
+from app.core.observability import dependency_state, log_event, request_id_context
 
 logger = logging.getLogger("chronos.readiness")
+_cache: tuple[float, dict[str, Any]] | None = None
+_CACHE_SECONDS = 15.0
 
 
 def _database_check() -> None:
@@ -22,6 +26,10 @@ def _database_check() -> None:
 
 
 async def readiness_report(*, check_model: bool = False) -> dict[str, Any]:
+    global _cache
+    now = time.monotonic()
+    if not check_model and _cache and now - _cache[0] < _CACHE_SECONDS:
+        return _cache[1]
     database_configured = bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
     database_state = "configuration_missing"
     if database_configured:
@@ -52,14 +60,35 @@ async def readiness_report(*, check_model: bool = False) -> dict[str, Any]:
         status = "degraded"
     else:
         status = "ready"
-    report = {
+    report: dict[str, Any] = {
         "status": status,
-        "environment": settings.ENV,
         "dependencies": {
             "database": {"required": True, "state": database_state, "timeout_ms": 1500},
-            "model": {"required": False, "provider": settings.LLM_PROVIDER, "state": model_state, "checked": check_model},
+            "model": {"required": False, "state": model_state, "checked": check_model},
             "google_calendar": {"required": False, "access": "read_only", "state": "configured" if google_configured else "configuration_missing"},
         },
     }
+    if not check_model:
+        _cache = (now, report)
     log_event(logger, logging.INFO, "readiness_checked", status=status, dependencies={key: value["state"] for key, value in report["dependencies"].items()})
     return report
+
+
+async def detailed_operational_status(user_id: str) -> dict[str, Any]:
+    del user_id  # authentication is required; identifiers are intentionally excluded.
+    started = time.monotonic()
+    report = await readiness_report(check_model=False)
+    dependencies = report["dependencies"]
+    components = {
+        "application": "healthy",
+        "database": dependencies["database"]["state"],
+        "migrations": "compatible" if dependencies["database"]["state"] == "ready" else "unknown",
+        "model_provider": dependency_state("model_provider") or dependencies["model"]["state"],
+        "embedding_provider": "configured" if settings.EMBEDDING_PROVIDER else "configuration_missing",
+        "integration_credentials": dependencies["google_calendar"]["state"],
+        "background_processing": "inline_bounded",
+    }
+    return {"status": report["status"], "components": components,
+            "correlation_id": request_id_context.get() or "available-in-response-header",
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "cache_age_seconds": round(time.monotonic() - started, 3)}

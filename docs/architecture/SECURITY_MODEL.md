@@ -1,5 +1,9 @@
 # Security Model
 
+Migrations `001` through `027` are immutable. Migration `028` adds owner-scoped operational audit data, atomic quota accounting, lifecycle RPCs, restricted grants, and bounded retention. Later security changes require another forward migration.
+
+Frontend hosting sends CSP, frame, MIME, referrer, and permissions headers. Backend trusted hosts and exact CORS origins are environment-configured; a preview regex must be anchored HTTPS without broad wildcards. External source URLs require HTTPS and reject credentials and private literal addresses. MCP endpoints additionally require an explicit host allow-list.
+
 - Validate bearer tokens through Supabase Auth; never accept user identity from request data.
 - Keep RLS enabled and scope every user-owned query by authenticated user ID.
 - Keep service-role, Groq, Google client-secret, and encryption credentials on the backend.

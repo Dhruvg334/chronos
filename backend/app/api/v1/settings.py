@@ -3,9 +3,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_current_user, get_repositories
-from app.core.config import settings
 from app.repositories.protocols import RepositorySet
-from app.schemas.planning_profile import IntegrationStatus, PlanningProfile, PlanningProfileResponse
+from app.schemas.planning_profile import PlanningProfile, PlanningProfileResponse
 from app.schemas.personalization import OnboardingSaveRequest, PreferenceUpdate
 
 router = APIRouter()
@@ -80,26 +79,3 @@ def update_preferences(request: PreferenceUpdate, user_id: str = Depends(get_cur
     validated = PlanningProfile.model_validate({**current, **request.model_dump(mode="json")})
     updated = repositories.planning_profiles.update(user_id, {key: getattr(validated, key) for key in PREFERENCE_FIELDS})
     return {key: updated[key] for key in PREFERENCE_FIELDS}
-
-
-@router.get("/integrations", response_model=list[IntegrationStatus])
-def get_integration_status(
-    user_id: str = Depends(get_current_user),
-    repositories: RepositorySet = Depends(get_repositories),
-):
-    configured = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
-    raw = repositories.google_connections.get_status(user_id)
-    state = raw.get("state", "unavailable") if configured else "configuration_missing"
-    messages = {
-        "connected": "Calendar events are included in planning. ChronOS has read-only access.",
-        "disconnected": "Connect Google Calendar to include busy time in plans.",
-        "unavailable": "Calendar status is temporarily unavailable. Planning is using your availability profile only.",
-        "configuration_missing": "Calendar connection is not configured. Planning is using your availability profile only.",
-    }
-    return [IntegrationStatus(
-        state=state,
-        last_successful_sync=raw.get("last_successful_sync"),
-        retry_available=state in {"connected", "unavailable"},
-        planning_mode="calendar_and_profile" if state == "connected" else "profile_only",
-        message=messages[state],
-    )]

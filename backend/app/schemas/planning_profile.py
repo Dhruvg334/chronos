@@ -71,13 +71,3 @@ class PlanningProfile(BaseModel):
 
 class PlanningProfileResponse(PlanningProfile):
     updated_at: str | None = None
-
-
-class IntegrationStatus(BaseModel):
-    provider: str = "google_calendar"
-    access: str = "read_only"
-    state: str
-    last_successful_sync: str | None = None
-    retry_available: bool
-    planning_mode: str
-    message: str

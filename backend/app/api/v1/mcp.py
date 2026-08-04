@@ -11,6 +11,7 @@ from app.mcp.server import ChronosMcpServer, McpCall, ServerTool
 from app.repositories.protocols import RepositorySet
 from app.services.core_journey import CoreJourneyService
 from app.workflows.tools import PermissionClass
+from app.services.usage_limits import UsageCategory, enforce_if_available
 
 router = APIRouter()
 
@@ -48,6 +49,7 @@ def tools(repositories: RepositorySet = Depends(get_repositories), user_id: str 
 
 @router.post("/invoke")
 def invoke(call: McpCall, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories)):
+    enforce_if_available(repositories.operations, user_id, UsageCategory.MCP)
     try:
         result = _server(repositories).invoke(user_id, call)
         repositories.integrations.append_audit(user_id, {"provider": "mcp", "event_type": "tool_invocation", "outcome": result["status"], "request_id": request_id_context.get(), "safe_metadata": {"tool_name": call.tool}})

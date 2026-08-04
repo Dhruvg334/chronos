@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiUrl, apiFetch as fetch, getApiErrorMessage } from '../../lib/api';
 import type { CommitmentDraft, ApproveCommitmentsRequest } from '../../types/api';
 import { CommitmentDraftCard } from './CommitmentDraftCard';
-import { AgentConsole } from '../agent/AgentConsole';
+import { WorkflowTracePanel } from './WorkflowTracePanel';
 
 interface ExtractionReviewProps {
   agentRunId: string;
@@ -103,7 +103,7 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({ agentRunId, 
         <div className="md:col-span-1">
           <div className="sticky top-6">
             <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Agent status</h3>
-            <AgentConsole agentRunId={agentRunId} />
+            <WorkflowTracePanel runId={agentRunId} />
           </div>
         </div>
       </div>

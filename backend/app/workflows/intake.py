@@ -4,6 +4,7 @@ import re
 from datetime import datetime, timezone
 
 from app.models.gateway import ModelGateway, ModelRequest
+from app.core.versions import INTAKE_PROMPT_VERSION, SCHEMA_VERSION
 from app.schemas.intake import ExtractedCommitment, IntakeResponse
 from app.workflows.runtime import WorkflowRunner
 
@@ -84,6 +85,7 @@ class IntakeWorkflow:
             model_role="fast",
             max_tokens=4000,
             temperature=0,
+            prompt_version=INTAKE_PROMPT_VERSION, schema_version=SCHEMA_VERSION,
         )
         try:
             response = await self.runner.run_step(
@@ -94,6 +96,9 @@ class IntakeWorkflow:
                 provider=self.gateway.metadata().get("provider"),
                 model=self.gateway.metadata().get("fast_model") or self.gateway.metadata().get("model"),
                 request_units=2,
+                prompt_version=request.prompt_version,
+                schema_version=request.schema_version,
+                temperature=request.temperature,
             )
             validated = validate_intake_output(response.value, text)
             self.runner.complete(context, {"draft_count": len(validated.drafts), "question_count": len(validated.questions)})

@@ -12,6 +12,7 @@ import type { PlanningProfile } from "../types/api";
 import { PreferenceSettings } from "../components/settings/PreferenceSettings";
 import { ContextSettings } from "../components/settings/ContextSettings";
 import { IntegrationSettings } from "../components/settings/IntegrationSettings";
+import { DataControls } from "../components/settings/DataControls";
 
 const DAYS = [
   "Monday",
@@ -342,6 +343,7 @@ export default function Settings() {
         </Surface>
         <PreferenceSettings />
         <ContextSettings />
+        <DataControls />
       </div>
     </AppShell>
   );

@@ -642,6 +642,60 @@ class SupabaseWeeklyPlansRepository(_OwnedCrudRepository):
             raise self._failure("weekly_plan.approve_transaction", exc) from exc
 
 
+class SupabaseOperationalRepository(_BaseRepository):
+    _export_tables = (
+        "projects", "outcomes", "routines", "commitments", "tasks",
+        "focus_blocks", "reflections", "memory_items", "knowledge_sources",
+        "integration_connections", "integration_items", "integration_action_proposals",
+    )
+
+    def consume_budget(self, user_id: str, category: str, user_limit: int, global_limit: int, units: int = 1) -> dict[str, Any]:
+        try:
+            return self.client.rpc("consume_usage_budget", {"p_user_id": user_id, "p_category": category,
+                "p_user_limit": user_limit, "p_global_limit": global_limit, "p_units": units}).execute().data
+        except Exception as exc:
+            raise self._failure("operations.consume_budget", exc) from exc
+
+    def append_audit(self, user_id: str | None, data: dict[str, Any]) -> None:
+        safe = {key: value for key, value in data.items() if key in {
+            "event_type", "outcome", "failure_code", "request_id", "workflow_id", "safe_metadata"}}
+        try:
+            self.client.table("operational_audit_events").insert({**safe, "user_id": user_id}).execute()
+        except Exception as exc:
+            raise self._failure("operations.audit", exc) from exc
+
+    def inventory(self, user_id: str) -> dict[str, int]:
+        try:
+            return self.client.rpc("account_data_inventory", {"p_user_id": user_id}).execute().data
+        except Exception as exc:
+            raise self._failure("operations.inventory", exc) from exc
+
+    def export(self, user_id: str) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        try:
+            result["planning_profile"] = (self.client.table("user_profiles").select("*").eq("id", user_id).limit(1).execute().data or [])
+            for table in self._export_tables:
+                rows = self.client.table(table).select("*").eq("user_id", user_id).execute().data or []
+                if table == "knowledge_sources":
+                    rows = [{k: v for k, v in row.items() if k not in {"original_metadata"}} for row in rows]
+                result[table] = rows
+            return result
+        except Exception as exc:
+            raise self._failure("operations.export", exc) from exc
+
+    def delete_knowledge_source(self, user_id: str, source_id: str) -> dict[str, Any]:
+        try:
+            return self.client.rpc("delete_knowledge_source_transaction", {"p_user_id": user_id, "p_source_id": source_id}).execute().data
+        except Exception as exc:
+            raise self._failure("operations.delete_knowledge_source", exc) from exc
+
+    def delete_account(self, user_id: str, confirmation: str) -> dict[str, Any]:
+        try:
+            return self.client.rpc("delete_account_transaction", {"p_user_id": user_id, "p_confirmation": confirmation}).execute().data
+        except Exception as exc:
+            raise self._failure("operations.delete_account", exc) from exc
+
+
 def create_repository_set(client: Client) -> RepositorySet:
     return RepositorySet(
         commitments=SupabaseCommitmentsRepository(client),
@@ -660,4 +714,5 @@ def create_repository_set(client: Client) -> RepositorySet:
         knowledge=SupabaseKnowledgeRepository(client),
         context_packs=SupabaseContextPackRepository(client),
         integrations=SupabaseIntegrationsRepository(client),
+        operations=SupabaseOperationalRepository(client),
     )

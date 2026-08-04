@@ -15,6 +15,7 @@ from app.schemas.core import CreatePlanBlockRequest, PlanResponse
 from app.services.core_journey import CoreJourneyService, rank_commitments
 from app.workflows.adaptive_planning import AdaptivePlanningWorkflow
 from app.workflows.runtime import WorkflowRunner
+from app.services.usage_limits import UsageCategory, enforce_if_available
 
 router = APIRouter()
 
@@ -48,6 +49,8 @@ async def recommend_adaptive_plan(
     gateway: ModelGateway = Depends(get_model_gateway),
     embeddings: EmbeddingGateway = Depends(get_embedding_gateway),
 ):
+    enforce_if_available(repositories.operations, user_id, UsageCategory.MODEL)
+    enforce_if_available(repositories.operations, user_id, UsageCategory.PROPOSAL)
     workflow = AdaptivePlanningWorkflow(
         gateway,
         WorkflowRunner(
@@ -77,9 +80,11 @@ async def approve_adaptive_plan(
     proposal = repositories.planning.get_proposal(user_id, proposal_id)
     if not proposal or proposal.get("action_type") != "commitment_reschedule":
         from app.core.errors import ChronosError, ErrorCode
+        enforce_if_available(repositories.operations, user_id, UsageCategory.FAILED_APPROVAL)
         raise ChronosError(ErrorCode.VALIDATION, "Adaptive plan proposal not found.")
     if proposal.get("status") != "pending":
         from app.core.errors import ChronosError, ErrorCode
+        enforce_if_available(repositories.operations, user_id, UsageCategory.FAILED_APPROVAL)
         raise ChronosError(ErrorCode.CONFLICT, "This adaptive plan proposal is no longer pending.")
     blocks = (proposal.get("payload_json") or {}).get("adaptive_plan", {}).get("blocks", [])
     candidate = CandidatePlan.model_validate((proposal.get("payload_json") or {}).get("adaptive_plan"))

@@ -13,6 +13,7 @@ from app.integrations.service import IntegrationService
 from app.repositories.protocols import RepositorySet
 from app.schemas.integrations import IntegrationProposalRequest, ProposalApprovalRequest, ProposalDecisionRequest, ResourceSelectionRequest
 from app.services.context_service import KnowledgeService
+from app.services.usage_limits import UsageCategory, enforce_if_available
 
 router = APIRouter()
 
@@ -29,6 +30,7 @@ def list_items(provider: str | None = None, project_id: str | None = None, user_
 
 @router.post("/{provider}/sync")
 def sync(provider: str, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories), registry: ConnectorRegistry = Depends(get_connector_registry)):
+    enforce_if_available(repositories.operations, user_id, UsageCategory.INTEGRATION_SYNC)
     return IntegrationService(repositories, registry).sync(user_id, provider, request_id=request_id_context.get())
 
 
@@ -64,6 +66,7 @@ def pending(user_id: str = Depends(get_current_user), repositories: RepositorySe
 
 @router.post("/proposals")
 def propose(request: IntegrationProposalRequest, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories), registry: ConnectorRegistry = Depends(get_connector_registry)):
+    enforce_if_available(repositories.operations, user_id, UsageCategory.PROPOSAL)
     item = repositories.integrations.get_item(user_id, request.item_id)
     if not item: from app.core.errors import ChronosError, ErrorCode; raise ChronosError(ErrorCode.VALIDATION, "External source was not found.")
     payload = {"project_id": request.project_id, "source_item_id": request.item_id, "untrusted_content": True}
@@ -88,6 +91,9 @@ def approve(proposal_id: str, request: ProposalApprovalRequest, user_id: str = D
 @router.post("/obsidian/import")
 async def import_obsidian(file: UploadFile = File(...), project_id: str | None = Form(default=None), user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories), embeddings: EmbeddingGateway = Depends(get_embedding_gateway)):
     data = await file.read(); notes = ObsidianImportAdapter().read(file.filename or "notes.md", data); service = KnowledgeService(repositories, embeddings)
+    enforce_if_available(repositories.operations, user_id, UsageCategory.INGESTION)
+    enforce_if_available(repositories.operations, user_id, UsageCategory.INGESTION_BYTES, len(data))
+    enforce_if_available(repositories.operations, user_id, UsageCategory.EMBEDDING)
     results = []
     for note in notes:
         result = await service.ingest_text(user_id, title=note.title, source_type="project_context" if project_id else "document", content=note.text, project_id=project_id, idempotency_key=f"obsidian:{project_id or 'general'}:{note.relative_path}", metadata={"relative_path": note.relative_path, "links": list(note.links), "provider": "obsidian", "untrusted_content": True})

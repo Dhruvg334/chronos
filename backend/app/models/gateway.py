@@ -23,6 +23,8 @@ class ModelRequest:
     max_tokens: int = 1200
     temperature: float = 0.1
     metadata: dict[str, str] = field(default_factory=dict)
+    prompt_version: str = "unspecified"
+    schema_version: str = "unspecified"
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,11 @@ class ModelResponse:
     provider: str
     model: str
     request_id: str | None = None
+    prompt_version: str = "unspecified"
+    schema_version: str = "unspecified"
+    latency_ms: float = 0
+    request_count: int = 1
+    token_usage: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -39,6 +46,11 @@ class StructuredResponse(Generic[T]):
     provider: str
     model: str
     repair_attempts: int = 0
+    prompt_version: str = "unspecified"
+    schema_version: str = "unspecified"
+    latency_ms: float = 0
+    request_count: int = 1
+    token_usage: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

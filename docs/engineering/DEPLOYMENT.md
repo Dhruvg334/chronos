@@ -1,5 +1,11 @@
 # Deployment
 
+Runtime Python dependencies are in `backend/requirements.txt`; test tooling is in `backend/requirements-dev.txt`. Public liveness is `/api/v1/health/live`, public bounded readiness is `/api/v1/health/ready`, and authenticated detail is `/api/v1/operations/status`.
+
+Configure rate limits, CORS origins, trusted hosts, provider credentials, and retention operations with backend-only environment settings. Netlify receives only `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`. CSP and related headers are in `netlify.toml`; backend secrets never belong in frontend variables.
+
+The current client-only SPA does not enable React Router RSC or server-action modes. The package advisory database nevertheless reports the RSC CSRF advisory against `react-router-dom` 7.18.2, and no fixed compatible release is published in the configured registry. Do not enable those modes; upgrade and revalidate as soon as a fixed release is available.
+
 The frontend and API deploy independently. Netlify serves only the compiled Vite application; FastAPI runs on a Python web service with Supabase as its persistent store. Neither service relies on a local persistent filesystem.
 
 ## Netlify frontend

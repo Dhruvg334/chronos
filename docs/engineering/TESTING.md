@@ -1,5 +1,9 @@
 # Testing
 
+Focused operational checks are `python -m pytest tests/test_evals.py tests/test_observability.py tests/test_rate_limits.py tests/test_security_controls.py tests/test_data_lifecycle.py tests/test_health.py tests/test_legacy_cleanup.py`.
+
+The evaluation corpus is synthetic and versioned; metric reports include denominators. Unit checks use fakes and remain offline. Migration/RPC ownership and rollback checks require explicitly selected local-Supabase integration tests.
+
 Default tests are offline. They must not open sockets, local ports, Docker, Supabase, Google, or Groq. Repository, auth, model, and browser-network boundaries use deterministic fakes.
 
 Backend:

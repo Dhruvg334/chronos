@@ -1,5 +1,6 @@
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     ENV: str = "development"
@@ -57,6 +58,16 @@ class Settings(BaseSettings):
     MCP_ALLOWED_SERVERS: List[str] = []
     MCP_REQUEST_TIMEOUT_SECONDS: float = 10.0
     MCP_REQUEST_BUDGET: int = 4
+    MODEL_CALLS_PER_HOUR_USER: int = 30
+    MODEL_CALLS_PER_HOUR_GLOBAL: int = 1000
+    EMBEDDING_CALLS_PER_HOUR_USER: int = 60
+    EMBEDDING_CALLS_PER_HOUR_GLOBAL: int = 3000
+    INGESTION_REQUESTS_PER_HOUR_USER: int = 12
+    INGESTION_BYTES_PER_HOUR_USER: int = 25_000_000
+    INTEGRATION_SYNCS_PER_HOUR_USER: int = 12
+    MCP_CALLS_PER_HOUR_USER: int = 60
+    PROPOSALS_PER_HOUR_USER: int = 40
+    FAILED_APPROVALS_PER_HOUR_USER: int = 10
     
     # Encryption key (32-byte url-safe base64 string)
     ENCRYPTION_KEY: str = ""
@@ -69,6 +80,15 @@ class Settings(BaseSettings):
     ]
     # Optional anchored regex for intentionally enabled deploy-preview origins.
     BACKEND_CORS_ORIGIN_REGEX: Optional[str] = None
+    BACKEND_ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "testserver"]
+
+    @field_validator("BACKEND_CORS_ORIGIN_REGEX")
+    @classmethod
+    def validate_preview_regex(cls, value: Optional[str]) -> Optional[str]:
+        from app.core.security import is_safe_cors_regex
+        if not is_safe_cors_regex(value):
+            raise ValueError("CORS origin regex must be an anchored HTTPS pattern without broad wildcards")
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",

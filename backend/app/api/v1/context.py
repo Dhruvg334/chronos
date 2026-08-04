@@ -9,6 +9,7 @@ from app.embeddings.gateway import EmbeddingGateway
 from app.repositories.protocols import RepositorySet
 from app.schemas.context import ContextPackRequest, KnowledgeTextCreate, MemoryCreate, MemoryDecision, MemoryPatch, RetrievalRequest
 from app.services.context_service import ContextPackService, KnowledgeService, MemoryService, RetrievalService
+from app.services.usage_limits import UsageCategory, enforce_if_available
 
 router = APIRouter()
 
@@ -46,6 +47,9 @@ async def list_knowledge(project_id: str | None = Query(default=None), user_id: 
 
 @router.post("/knowledge/text", status_code=status.HTTP_201_CREATED)
 async def ingest_text(request: KnowledgeTextCreate, user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories), embeddings: EmbeddingGateway = Depends(get_embedding_gateway)):
+    enforce_if_available(repositories.operations, user_id, UsageCategory.INGESTION)
+    enforce_if_available(repositories.operations, user_id, UsageCategory.INGESTION_BYTES, len(request.content.encode("utf-8")))
+    enforce_if_available(repositories.operations, user_id, UsageCategory.EMBEDDING)
     return await KnowledgeService(repositories, embeddings).ingest_text(user_id, **request.model_dump())
 
 
@@ -53,6 +57,9 @@ async def ingest_text(request: KnowledgeTextCreate, user_id: str = Depends(get_c
 async def ingest_file(file: UploadFile = File(...), project_id: str | None = Form(default=None), idempotency_key: str = Form(..., min_length=8, max_length=160),
                       user_id: str = Depends(get_current_user), repositories: RepositorySet = Depends(get_repositories), embeddings: EmbeddingGateway = Depends(get_embedding_gateway)):
     data = await file.read()
+    enforce_if_available(repositories.operations, user_id, UsageCategory.INGESTION)
+    enforce_if_available(repositories.operations, user_id, UsageCategory.INGESTION_BYTES, len(data))
+    enforce_if_available(repositories.operations, user_id, UsageCategory.EMBEDDING)
     return await KnowledgeService(repositories, embeddings).ingest_file(user_id, filename=file.filename or "document", content_type=file.content_type,
                                                                         data=data, project_id=project_id, idempotency_key=idempotency_key)
 

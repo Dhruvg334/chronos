@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.observability import request_id_context
 from app.workflows.intake import IntakeWorkflow
 from app.workflows.runtime import WorkflowRunner
+from app.services.usage_limits import UsageCategory, enforce_if_available
 
 router = APIRouter(prefix="/api/v1/ai/intake", tags=["ai", "intake"])
 
@@ -68,6 +69,7 @@ async def process_intake(
     gateway: ModelGateway = Depends(get_model_gateway),
     repositories: RepositorySet = Depends(get_repositories),
 ):
+    enforce_if_available(repositories.operations, user_id, UsageCategory.MODEL)
     workflow = IntakeWorkflow(
         gateway,
         WorkflowRunner(

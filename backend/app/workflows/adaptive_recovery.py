@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from app.core.errors import ChronosError, ErrorCode
 from app.models.gateway import ModelGateway, ModelRequest
+from app.core.versions import RECOVERY_PROMPT_VERSION, SCHEMA_VERSION
 from app.embeddings.gateway import EmbeddingGateway
 from app.repositories.protocols import RepositorySet
 from app.schemas.adaptive import AdaptiveRecoveryResponse, RecoveryCause, RecoveryModelOutput, RecoveryOption
@@ -111,6 +112,7 @@ class AdaptiveRecoveryWorkflow:
                 model_role="reasoning",
                 temperature=0,
                 metadata={"workflow_id": context.workflow_id},
+                prompt_version=RECOVERY_PROMPT_VERSION, schema_version=SCHEMA_VERSION,
             )
             ai_used = True
             try:
@@ -122,6 +124,9 @@ class AdaptiveRecoveryWorkflow:
                     provider=self.gateway.metadata().get("provider"),
                     model=self.gateway.metadata().get("reasoning_model") or self.gateway.metadata().get("model"),
                     request_units=2,
+                    prompt_version=request.prompt_version,
+                    schema_version=request.schema_version,
+                    temperature=request.temperature,
                 )
                 model_options = response.value.options
             except ChronosError as exc:

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
+import time
 from typing import Any, Sequence, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from app.core.errors import ChronosError, ErrorCode
-from app.core.observability import log_event
+from app.core.observability import log_event, metrics, record_dependency_state
 from app.models.gateway import (
     ModelRequest,
     ModelResponse,
@@ -53,7 +55,7 @@ class GroqModelGateway:
             raise ChronosError(ErrorCode.CONFIGURATION, "The model provider is not configured.")
         return model
 
-    async def _completion(self, request: ModelRequest, *, extra: dict[str, Any] | None = None) -> tuple[dict[str, Any], str]:
+    async def _completion(self, request: ModelRequest, *, extra: dict[str, Any] | None = None) -> tuple[dict[str, Any], str, float, int]:
         model = self._model(request.model_role)
         messages = []
         if request.system_prompt:
@@ -69,6 +71,7 @@ class GroqModelGateway:
         headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
 
         for attempt in range(self._max_retries + 1):
+            started = time.perf_counter()
             try:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
                     response = await client.post(f"{self._base_url}/chat/completions", headers=headers, json=body)
@@ -88,29 +91,40 @@ class GroqModelGateway:
                             context={"provider": "groq", "failure": "json_validate_failed"},
                         )
                 if response.status_code in {500, 502, 503, 504} and attempt < self._max_retries:
+                    await asyncio.sleep(min(0.05 * (2 ** attempt), 0.5))
                     continue
                 response.raise_for_status()
-                return response.json(), model
+                latency = round((time.perf_counter() - started) * 1000, 2)
+                metrics.increment("model_provider_calls_total", provider="groq", outcome="success")
+                metrics.observe("model_provider_latency_ms", latency, provider="groq")
+                record_dependency_state("model_provider", "reachable")
+                return response.json(), model, latency, attempt + 1
             except ChronosError:
                 raise
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 if attempt >= self._max_retries:
+                    metrics.increment("model_provider_errors_total", provider="groq", failure="provider_unavailable")
+                    record_dependency_state("model_provider", "unavailable")
                     log_event(logger, logging.WARNING, "model_unavailable", provider="groq", exception=type(exc).__name__)
                     raise ChronosError(
                         ErrorCode.EXTERNAL_UNAVAILABLE,
                         "The model provider is temporarily unavailable.",
                         context={"provider": "groq", "failure": "timeout_or_network"},
                     ) from exc
+                await asyncio.sleep(min(0.05 * (2 ** attempt), 0.5))
             except (httpx.HTTPStatusError, ValueError) as exc:
                 log_event(logger, logging.ERROR, "model_provider_error", provider="groq", exception=type(exc).__name__)
                 raise ChronosError(ErrorCode.EXTERNAL_UNAVAILABLE, "The model provider could not complete the request.") from exc
         raise ChronosError(ErrorCode.EXTERNAL_UNAVAILABLE, "The model provider is temporarily unavailable.")
 
     async def generate_text(self, request: ModelRequest) -> ModelResponse:
-        payload, model = await self._completion(request)
+        payload, model, latency, request_count = await self._completion(request)
         try:
             choice = payload["choices"][0]["message"]
-            return ModelResponse(text=choice.get("content") or "", provider="groq", model=model, request_id=payload.get("id"))
+            usage = {key: int(value) for key, value in (payload.get("usage") or {}).items() if isinstance(value, int)}
+            return ModelResponse(text=choice.get("content") or "", provider="groq", model=model, request_id=payload.get("id"),
+                prompt_version=request.prompt_version, schema_version=request.schema_version, latency_ms=latency,
+                request_count=request_count, token_usage=usage)
         except (KeyError, IndexError, TypeError) as exc:
             raise ChronosError(ErrorCode.MODEL_OUTPUT_INVALID, "The model returned an invalid response.") from exc
 
@@ -119,7 +133,7 @@ class GroqModelGateway:
         current = request
         for repair_attempt in range(2):
             try:
-                payload, model = await self._completion(
+                payload, model, latency, request_count = await self._completion(
                     current,
                     extra={"response_format": {"type": "json_schema", "json_schema": {"name": schema.__name__, "strict": False, "schema": schema_payload}}},
                 )
@@ -131,7 +145,11 @@ class GroqModelGateway:
             try:
                 raw = payload["choices"][0]["message"]["content"]
                 value = schema.model_validate_json(raw)
-                return StructuredResponse(value=value, provider="groq", model=model, repair_attempts=repair_attempt)
+                usage = {key: int(value) for key, value in (payload.get("usage") or {}).items() if isinstance(value, int)}
+                metrics.increment("model_repairs_total", provider="groq", value=repair_attempt)
+                return StructuredResponse(value=value, provider="groq", model=model, repair_attempts=repair_attempt,
+                    prompt_version=request.prompt_version, schema_version=request.schema_version, latency_ms=latency,
+                    request_count=request_count + repair_attempt, token_usage=usage)
             except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as exc:
                 if repair_attempt == 1:
                     log_event(logger, logging.WARNING, "model_validation_failed", schema=schema.__name__, error_count=len(exc.errors()) if isinstance(exc, ValidationError) else 1)
@@ -151,6 +169,8 @@ class GroqModelGateway:
             max_tokens=request.max_tokens,
             temperature=0,
             metadata=request.metadata,
+            prompt_version=request.prompt_version,
+            schema_version=request.schema_version,
         )
 
     async def select_tools(self, request: ModelRequest, tools: Sequence[ToolDefinition]) -> ToolPlan:
@@ -161,7 +181,7 @@ class GroqModelGateway:
             max_tokens=request.max_tokens,
             temperature=0,
         )
-        payload, model = await self._completion(
+        payload, model, _, _ = await self._completion(
             tool_request,
             extra={"tools": [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.input_schema}} for t in tools], "tool_choice": "auto"},
         )

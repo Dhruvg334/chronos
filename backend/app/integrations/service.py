@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.core.errors import ChronosError, ErrorCode
-from app.core.observability import log_event
+from app.core.versions import INTEGRATION_PROPOSAL_PROMPT_VERSION
+from app.core.observability import log_event, observe_latency, record_dependency_state
 from app.integrations.contracts import ConnectionState
 from app.integrations.registry import ConnectorRegistry
 from app.repositories.protocols import RepositorySet
@@ -39,13 +40,18 @@ class IntegrationService:
         return {"connected": "Connected with read-only access.", "degraded": "Using cached context while the provider is unavailable.", "expired": "Reconnect to resume synchronization.", "revoked": "Authorization was revoked.", "error": "Synchronization needs attention.", "disconnected": "Available to connect."}.get(state, "Available to connect.")
 
     def sync(self, user_id: str, provider: str, *, request_id: str | None = None) -> dict[str, Any]:
+        return self._sync_observed(user_id, provider, request_id=request_id)
+
+    def _sync_observed(self, user_id: str, provider: str, *, request_id: str | None = None) -> dict[str, Any]:
         connector = self.registry.get(provider); connection = self.repositories.integrations.get_connection(user_id, provider)
         if not connector.configured(): raise ChronosError(ErrorCode.EXTERNAL_UNAVAILABLE, "This integration is not configured on the server.")
         if not connection: raise ChronosError(ErrorCode.VALIDATION, "Connect this provider before synchronizing.")
         cursor = connection.get("sync_cursor"); total = 0; pages = 0
         try:
             while pages < 10:
-                page = connector.sync(user_id, cursor, limit=100); pages += 1
+                with observe_latency("integration_sync_duration_ms", provider=provider):
+                    page = connector.sync(user_id, cursor, limit=100)
+                pages += 1
                 for item in page.items:
                     payload = item.model_dump(mode="json")
                     selected = set((connection.get("sync_metadata") or {}).get("selected_resources") or [])
@@ -62,6 +68,7 @@ class IntegrationService:
             now = datetime.now(timezone.utc).isoformat()
             self.repositories.integrations.update_connection(user_id, connection["id"], {"status": "connected", "last_success_at": now, "last_error_at": None, "last_error_code": None, "sync_cursor": cursor})
             self.audit(user_id, provider, "synchronization", "succeeded", connection["id"], request_id, {"item_count": total, "pages": pages})
+            record_dependency_state(f"integration:{provider}", "reachable")
             return {"state": "connected", "item_count": total, "cursor_advanced": bool(cursor)}
         except ChronosError: raise
         except Exception as exc:
@@ -69,6 +76,7 @@ class IntegrationService:
             self.repositories.integrations.update_connection(user_id, connection["id"], {"status": state, "last_error_at": datetime.now(timezone.utc).isoformat(), "last_error_code": code})
             self.audit(user_id, provider, "provider_failure", state, connection["id"], request_id, {"error_code": code})
             log_event(logger, logging.WARNING, "integration_sync_failed", provider=provider, error_code=code)
+            record_dependency_state(f"integration:{provider}", state)
             return {"state": state, "item_count": 0, "cached": True, "error_code": code}
 
     @staticmethod
@@ -97,9 +105,9 @@ class IntegrationService:
         item = self.repositories.integrations.get_item(user_id, item_id)
         if not item or str(item["connection_id"]) != str(connection_id): raise ChronosError(ErrorCode.VALIDATION, "External source was not found.")
         proposal = self.repositories.integrations.create_proposal(user_id, {"id": str(uuid.uuid4()), "connection_id": connection_id, "integration_item_id": item_id, "action_type": action_type, "target": {"kind": action_type}, "safe_summary": summary[:500], "validated_payload": payload, "status": "pending", "approval_requirement": "explicit", "idempotency_key": idempotency_key})
-        self.audit(user_id, item["provider"], "proposal_generation", "pending", connection_id, None, {"action_type": action_type})
+        self.audit(user_id, item["provider"], "proposal_generation", "pending", connection_id, None, {"action_type": action_type, "policy_version": INTEGRATION_PROPOSAL_PROMPT_VERSION})
         return proposal
 
     def audit(self, user_id: str, provider: str, event_type: str, outcome: str, connection_id: str | None, request_id: str | None, metadata: dict[str, Any]) -> None:
-        safe = {key: value for key, value in metadata.items() if key in {"item_count", "pages", "error_code", "action_type", "permission_class", "tool_name"}}
+        safe = {key: value for key, value in metadata.items() if key in {"item_count", "pages", "error_code", "action_type", "permission_class", "tool_name", "policy_version"}}
         self.repositories.integrations.append_audit(user_id, {"connection_id": connection_id, "provider": provider, "event_type": event_type, "outcome": outcome, "request_id": request_id, "safe_metadata": safe})

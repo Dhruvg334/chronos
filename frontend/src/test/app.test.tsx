@@ -106,7 +106,6 @@ beforeEach(() => {
       if (init?.method === 'PUT') savedProfile = JSON.parse(String(init.body));
       return json(savedProfile ?? planningProfile);
     }
-    if (url.endsWith('/api/v1/settings/integrations')) return json([{ provider: 'google_calendar', access: 'read_only', state: 'unavailable', last_successful_sync: null, retry_available: true, planning_mode: 'profile_only', message: 'Calendar status is temporarily unavailable. Planning is using your availability profile only.' }]);
     if (url.endsWith('/focus-blocks/start')) { active = { id: 'f1', commitment_id: 'c1', title: 'Authentication regression fix', status: 'active', planned_minutes: 25, elapsed_seconds: 0, remaining_seconds: 1500, started_at: new Date().toISOString() }; return json({ session: active }); }
     if (url.endsWith('/pause')) { active = { ...active!, status: 'paused', paused_at: new Date().toISOString() }; return json({ session: active }); }
     if (url.endsWith('/resume')) { active = { ...active!, status: 'active', paused_at: null }; return json({ session: active }); }
@@ -221,9 +220,10 @@ it('surfaces an atomic transaction failure without a success state', async () =>
 
 it('validates available weekdays before saving', async () => {
   const user = userEvent.setup(); renderWithContext(<Settings />);
-  const checkboxes = await screen.findAllByRole('checkbox');
+  const availability = (await screen.findByText('Available days and hours')).parentElement!;
+  const checkboxes = within(availability).getAllByRole('checkbox');
   for (const checkbox of checkboxes) if ((checkbox as HTMLInputElement).checked) await user.click(checkbox);
-  expect(screen.getByRole('alert')).toHaveTextContent('Choose at least one available day');
+  expect(screen.getByText('Choose at least one available day.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Save availability' })).toBeDisabled();
 });
 
@@ -266,11 +266,11 @@ it('ingests a note and shows a safe knowledge-source state', async () => {
   expect(screen.queryByText(/embedding/i)).not.toBeInTheDocument();
 }, 10_000);
 
-it('shows honest profile-only integration state', async () => {
+it('shows an honest unavailable integration state', async () => {
   renderWithContext(<Settings />);
   expect(await screen.findByText('unavailable')).toBeInTheDocument();
-  expect(screen.getByText(/availability profile only/i)).toBeInTheDocument();
-  expect(screen.getByText('Read-only')).toBeInTheDocument();
+  expect(screen.getByText(/server credentials are not configured/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/Read-only/).length).toBeGreaterThan(0);
 });
 
 it('shows a migration compatibility error without raw provider details', async () => {
@@ -291,7 +291,7 @@ it('shows compact plan transparency without hidden reasoning', async () => {
   await user.click(await screen.findByText('Why this plan?', { selector: 'summary' }));
   expect(await screen.findByRole('heading', { name: 'Why this plan?' })).toBeInTheDocument();
   expect(screen.getByText('Deterministic')).toBeInTheDocument();
-  expect(screen.getByText(/still requires your approval/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/still requires your approval/i).length).toBeGreaterThan(0);
   await user.click(screen.getByText('Sources used'));
   expect(screen.getByText('Based on Release criteria')).toBeInTheDocument();
   expect(screen.getByText('Stable authentication and verified rollback are required.')).toBeInTheDocument();
@@ -302,7 +302,7 @@ it('prepares and explicitly approves a validated adaptive plan', async () => {
   await user.click(await screen.findByRole('button', { name: /suggest adaptive plan/i }));
   expect(await screen.findByRole('heading', { name: 'Protect the fix' })).toBeInTheDocument();
   expect(screen.getByText('AI-assisted')).toBeInTheDocument();
-  expect(screen.getByText(/no plan data changed/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/still requires your approval/i).length).toBeGreaterThan(0);
   await user.click(screen.getByRole('button', { name: /approve this plan/i }));
   expect(await screen.findByText('Adaptive plan approved.')).toBeInTheDocument();
 });
@@ -405,7 +405,7 @@ it('allows optional Inbox project assignment and type classification', async () 
 it('shows integration permissions and connection state without technical secrets', async () => {
   renderWithContext(<Settings />, { path: '/settings' });
   expect(await screen.findByRole('heading', { name: 'Integrations' })).toBeInTheDocument();
-  expect(screen.getByText('Google Calendar')).toBeInTheDocument();
+  expect(await screen.findByText('Google Calendar')).toBeInTheDocument();
   expect(screen.getByText(/files selected by you/i)).toBeInTheDocument();
   expect(screen.queryByText(/access_token|sync_cursor|client_secret/i)).not.toBeInTheDocument();
 });

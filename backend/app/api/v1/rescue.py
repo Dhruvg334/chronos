@@ -17,6 +17,7 @@ from app.api.v1.recommendations import concise_context
 from app.services.core_journey import rank_commitments
 from app.workflows.adaptive_recovery import AdaptiveRecoveryWorkflow
 from app.workflows.runtime import WorkflowRunner
+from app.services.usage_limits import UsageCategory, enforce_if_available
 
 router = APIRouter()
 
@@ -35,6 +36,8 @@ async def generate_rescue_plan(
     gateway: ModelGateway = Depends(get_model_gateway),
     embeddings: EmbeddingGateway = Depends(get_embedding_gateway),
 ) -> dict[str, Any]:
+    enforce_if_available(repositories.operations, user_id, UsageCategory.MODEL)
+    enforce_if_available(repositories.operations, user_id, UsageCategory.PROPOSAL)
     return (await AdaptiveRecoveryWorkflow(
         gateway,
         WorkflowRunner(
@@ -56,8 +59,10 @@ def get_rescue_plans(user_id: str = Depends(get_current_user), repositories: Rep
 def _pending(repositories: RepositorySet, user_id: str, proposal_id: str) -> dict[str, Any]:
     proposal = repositories.planning.get_proposal(user_id, proposal_id)
     if not proposal or proposal.get("action_type") != "commitment_rescue":
+        enforce_if_available(repositories.operations, user_id, UsageCategory.FAILED_APPROVAL)
         raise ChronosError(ErrorCode.VALIDATION, "Recovery proposal not found.")
     if proposal.get("status") != "pending":
+        enforce_if_available(repositories.operations, user_id, UsageCategory.FAILED_APPROVAL)
         raise ChronosError(ErrorCode.CONFLICT, "This recovery proposal is no longer pending.")
     return proposal
 

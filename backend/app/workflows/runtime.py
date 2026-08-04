@@ -13,6 +13,7 @@ from app.models.gateway import ModelGateway, ModelRequest, ToolDefinition, ToolP
 from app.repositories.protocols import WorkflowTraceRepository
 from app.workflows.approval import RecommendationFirstApprovalPolicy
 from app.workflows.tools import ToolRegistry
+from app.core.versions import TOOL_SELECTION_POLICY_VERSION
 
 
 @dataclass
@@ -31,6 +32,12 @@ class WorkflowTraceEvent:
     request_id: str | None = None
     workflow_id: str | None = None
     idempotency_key: str | None = None
+    prompt_version: str | None = None
+    schema_version: str | None = None
+    temperature: float | None = None
+    request_count: int = 0
+    token_usage: dict[str, int] = field(default_factory=dict)
+    repair_count: int = 0
 
     def persistence_payload(self) -> dict[str, Any]:
         return {
@@ -48,6 +55,12 @@ class WorkflowTraceEvent:
                 "request_id": self.request_id,
                 "workflow_id": self.workflow_id,
                 "idempotency_key": self.idempotency_key,
+                "prompt_version": self.prompt_version,
+                "schema_version": self.schema_version,
+                "temperature": self.temperature,
+                "request_count": self.request_count,
+                "token_usage": self.token_usage,
+                "repair_count": self.repair_count,
             },
         }
 
@@ -147,12 +160,20 @@ class WorkflowRunner:
         request_units: int = 0,
         timeout_seconds: float | None = None,
         tool_selected: str | None = None,
+        prompt_version: str | None = None,
+        schema_version: str | None = None,
+        temperature: float | None = None,
     ) -> Any:
         self._guard(context, name, reason_category, request_units)
         started = time.perf_counter()
         try:
             result = await asyncio.wait_for(operation(), timeout=min(timeout_seconds or context.timeout_seconds, context.timeout_seconds))
-            self._record(context, WorkflowTraceEvent(context.workflow, name, reason_category, "succeeded", (time.perf_counter() - started) * 1000, tool_selected=tool_selected, provider=provider, model=model, decision_summary=f"Completed {name}."))
+            self._record(context, WorkflowTraceEvent(context.workflow, name, reason_category, "succeeded", (time.perf_counter() - started) * 1000,
+                tool_selected=tool_selected, provider=getattr(result, "provider", provider), model=getattr(result, "model", model),
+                decision_summary=f"Completed {name}.", prompt_version=(prompt_version if getattr(result, "prompt_version", "unspecified") == "unspecified" else result.prompt_version),
+                schema_version=(schema_version if getattr(result, "schema_version", "unspecified") == "unspecified" else result.schema_version), temperature=temperature,
+                request_count=getattr(result, "request_count", request_units), token_usage=getattr(result, "token_usage", {}),
+                repair_count=getattr(result, "repair_attempts", 0)))
             return result
         except asyncio.TimeoutError as exc:
             self._record(context, WorkflowTraceEvent(context.workflow, name, reason_category, "failed", (time.perf_counter() - started) * 1000, tool_selected=tool_selected, error_classification=ErrorCode.WORKFLOW_FAILED, decision_summary=f"{name} exceeded its timeout."))
@@ -221,6 +242,9 @@ class WorkflowRunner:
             provider=metadata.get("provider"),
             model=metadata.get("tool_model") or metadata.get("model"),
             request_units=1,
+            prompt_version=request.prompt_version if request.prompt_version != "unspecified" else TOOL_SELECTION_POLICY_VERSION,
+            schema_version=request.schema_version,
+            temperature=request.temperature,
         )
         return await self.execute_tool(context, plan, user_approved=user_approved, internal_write_enabled=internal_write_enabled)
 

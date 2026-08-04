@@ -309,15 +309,5 @@ export interface PlanningProfile {
 
 export type PersonalPreferences = Pick<PlanningProfile, 'planning_style' | 'recommendation_frequency' | 'approval_strictness' | 'internal_write_automation_enabled' | 'preferred_focus_durations' | 'routine_continuity_preference' | 'quick_task_mode' | 'strategy_preferences' | 'explanation_detail'>;
 
-export interface IntegrationStatus {
-  provider: string;
-  access: 'read_only';
-  state: 'connected' | 'disconnected' | 'unavailable' | 'configuration_missing';
-  last_successful_sync: string | null;
-  retry_available: boolean;
-  planning_mode: 'calendar_and_profile' | 'profile_only';
-  message: string;
-}
-
 export interface IntegrationCatalogItem { provider: string; state: 'available' | 'connected' | 'degraded' | 'expired' | 'revoked' | 'disconnected' | 'error' | 'unavailable'; configured: boolean; read_only: true; capabilities: Array<{ name: string; permission_class: string; required_scopes: string[]; data_accessed: string[]; approval_required: boolean }>; requested_scopes: string[]; last_success_at: string | null; selected_resources: string[]; message: string }
 export interface ExternalProposal { id: string; connection_id: string; integration_item_id: string; provider?: string; action_type: 'create_task' | 'create_outcome' | 'create_event' | 'create_reference'; safe_summary: string; source_excerpt?: string; status: 'pending'; created_at?: string }

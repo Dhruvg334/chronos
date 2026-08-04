@@ -24,6 +24,11 @@ class ChronosError(Exception):
         self.public_message = public_message
         self.context = context or {}
 
+    @property
+    def failure_code(self) -> str:
+        from app.core.failures import classify_error
+        return classify_error(self.code, self.context).value
+
 
 HTTP_STATUS_BY_ERROR = {
     ErrorCode.VALIDATION: 422,

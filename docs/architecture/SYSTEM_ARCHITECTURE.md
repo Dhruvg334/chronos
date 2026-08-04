@@ -1,5 +1,7 @@
 # System Architecture
 
+Operational contracts for evaluation, health, limits, telemetry, lifecycle, and legacy isolation are defined in [Operations and recovery](../engineering/OPERATIONS.md) and [Evaluation system](../engineering/EVALUATION_SYSTEM.md).
+
 ## Boundaries
 
 The React frontend owns presentation and client interactions. TanStack Query owns server state and clears private cache data on logout. Supabase Auth owns browser sessions. Route pages load independently through `React.lazy`.
