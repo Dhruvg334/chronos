@@ -367,6 +367,114 @@ class SupabaseRecommendationFeedbackRepository(_BaseRepository):
             raise self._failure("recommendation_feedback.list", exc) from exc
 
 
+class SupabaseMemoryItemsRepository(_BaseRepository):
+    def list_for_user(self, user_id: str, category: str | None = None, project_id: str | None = None) -> list[dict[str, Any]]:
+        try:
+            query = self.client.table("memory_items").select("*").eq("user_id", user_id)
+            if category: query = query.eq("category", category)
+            if project_id: query = query.eq("project_id", project_id)
+            return query.order("updated_at", desc=True).execute().data or []
+        except Exception as exc:
+            raise self._failure("memory.list", exc) from exc
+
+    def get_for_user(self, user_id: str, memory_id: str) -> dict[str, Any] | None:
+        try:
+            rows = self.client.table("memory_items").select("*").eq("user_id", user_id).eq("id", memory_id).limit(1).execute().data or []
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise self._failure("memory.get", exc) from exc
+
+    def create(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("memory_items").insert({**data, "user_id": user_id}).execute().data or []
+            if not rows: raise RuntimeError("insert returned no row")
+            return rows[0]
+        except Exception as exc:
+            raise self._failure("memory.create", exc) from exc
+
+    def update(self, user_id: str, memory_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("memory_items").update(data).eq("user_id", user_id).eq("id", memory_id).execute().data or []
+            if not rows: raise ChronosError(ErrorCode.VALIDATION, "Memory not found.")
+            return rows[0]
+        except ChronosError:
+            raise
+        except Exception as exc:
+            raise self._failure("memory.update", exc) from exc
+
+
+class SupabaseKnowledgeRepository(_BaseRepository):
+    def list_sources(self, user_id: str, project_id: str | None = None) -> list[dict[str, Any]]:
+        try:
+            query = self.client.table("knowledge_sources").select("*").eq("user_id", user_id)
+            if project_id: query = query.eq("project_id", project_id)
+            return query.order("created_at", desc=True).execute().data or []
+        except Exception as exc:
+            raise self._failure("knowledge.sources", exc) from exc
+
+    def get_source(self, user_id: str, source_id: str) -> dict[str, Any] | None:
+        try:
+            rows = self.client.table("knowledge_sources").select("*").eq("user_id", user_id).eq("id", source_id).limit(1).execute().data or []
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise self._failure("knowledge.source", exc) from exc
+
+    def create_failed_source(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("knowledge_sources").insert({**data, "user_id": user_id, "status": "failed"}).execute().data or []
+            if not rows: raise RuntimeError("insert returned no row")
+            return rows[0]
+        except Exception as exc:
+            raise self._failure("knowledge.failed_source", exc) from exc
+
+    def update_source(self, user_id: str, source_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("knowledge_sources").update(data).eq("user_id", user_id).eq("id", source_id).execute().data or []
+            if not rows: raise ChronosError(ErrorCode.VALIDATION, "Knowledge source not found.")
+            return rows[0]
+        except ChronosError:
+            raise
+        except Exception as exc:
+            raise self._failure("knowledge.update_source", exc) from exc
+
+    def ingest(self, user_id: str, idempotency_key: str, source: dict[str, Any], chunks: list[dict[str, Any]]) -> dict[str, Any]:
+        try:
+            result = self.client.rpc("ingest_knowledge_source_transaction", {
+                "p_user_id": user_id, "p_idempotency_key": idempotency_key,
+                "p_source": source, "p_chunks": chunks,
+            }).execute().data
+            if not result or result.get("status") == "failed": raise RuntimeError((result or {}).get("error_code", "ingestion failed"))
+            return result
+        except Exception as exc:
+            raise self._failure("knowledge.ingest_transaction", exc) from exc
+
+    def retrieve(self, user_id: str, query: str, query_embedding: list[float], project_id: str | None, limit: int) -> list[dict[str, Any]]:
+        try:
+            return self.client.rpc("retrieve_knowledge_chunks", {
+                "p_user_id": user_id, "p_query": query, "p_query_embedding": query_embedding,
+                "p_project_id": project_id, "p_limit": limit,
+            }).execute().data or []
+        except Exception as exc:
+            raise self._failure("knowledge.retrieve", exc) from exc
+
+
+class SupabaseContextPackRepository(_BaseRepository):
+    def create(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            rows = self.client.table("context_packs").insert({**data, "user_id": user_id}).execute().data or []
+            if not rows: raise RuntimeError("insert returned no row")
+            return rows[0]
+        except Exception as exc:
+            raise self._failure("context_pack.create", exc) from exc
+
+    def get_for_user(self, user_id: str, pack_id: str) -> dict[str, Any] | None:
+        try:
+            rows = self.client.table("context_packs").select("*").eq("user_id", user_id).eq("id", pack_id).limit(1).execute().data or []
+            return rows[0] if rows else None
+        except Exception as exc:
+            raise self._failure("context_pack.get", exc) from exc
+
+
 class _OwnedCrudRepository(_BaseRepository):
     table_name: str
     label: str
@@ -476,4 +584,7 @@ def create_repository_set(client: Client) -> RepositorySet:
         routines=SupabaseRoutinesRepository(client),
         weekly_plans=SupabaseWeeklyPlansRepository(client),
         feedback=SupabaseRecommendationFeedbackRepository(client),
+        memory=SupabaseMemoryItemsRepository(client),
+        knowledge=SupabaseKnowledgeRepository(client),
+        context_packs=SupabaseContextPackRepository(client),
     )

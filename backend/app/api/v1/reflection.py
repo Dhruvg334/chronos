@@ -10,6 +10,7 @@ from app.core.errors import ChronosError, ErrorCode
 from app.repositories.protocols import RepositorySet
 from app.schemas.core import ReflectionRequest
 from app.services.core_journey import observed_risk
+from app.services.context_service import MemoryService
 
 router = APIRouter()
 
@@ -38,4 +39,9 @@ async def submit_reflection(request: ReflectionRequest, user_id: str = Depends(g
             if stage.get("id") == "reflection":
                 stage["status"] = "completed"
         spine = repositories.commitments.update_time_spine(user_id, request.commitment_id, {"spine_json": stages, "current_stage": "reflection"})
-    return {"reflection": reflection, "commitment": updated, "risk": {"risk_score": risk_score, "risk_level": risk_level}, "time_spine": spine}
+    try:
+        memory_proposal = MemoryService(repositories).propose_from_reflection(user_id, reflection)
+    except Exception:
+        # Reflection persistence remains successful when optional context learning is unavailable.
+        memory_proposal = None
+    return {"reflection": reflection, "commitment": updated, "risk": {"risk_score": risk_score, "risk_level": risk_level}, "time_spine": spine, "memory_proposal": memory_proposal}

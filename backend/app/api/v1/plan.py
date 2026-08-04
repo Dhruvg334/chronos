@@ -3,7 +3,8 @@ import uuid
 
 from fastapi import APIRouter, Depends, Header, Query, status
 
-from app.api.dependencies import get_current_user, get_model_gateway, get_repositories
+from app.api.dependencies import get_current_user, get_embedding_gateway, get_model_gateway, get_repositories
+from app.embeddings.gateway import EmbeddingGateway
 from app.core.config import settings
 from app.core.observability import request_id_context
 from app.models.gateway import ModelGateway
@@ -45,6 +46,7 @@ async def recommend_adaptive_plan(
     user_id: str = Depends(get_current_user),
     repositories: RepositorySet = Depends(get_repositories),
     gateway: ModelGateway = Depends(get_model_gateway),
+    embeddings: EmbeddingGateway = Depends(get_embedding_gateway),
 ):
     workflow = AdaptivePlanningWorkflow(
         gateway,
@@ -55,6 +57,7 @@ async def recommend_adaptive_plan(
             trace_repository=repositories.traces,
         ),
         repositories,
+        embeddings,
     )
     return await workflow.recommend(
         user_id=user_id,

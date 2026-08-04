@@ -10,6 +10,7 @@ import {
 import { apiFetch, apiUrl, getApiErrorMessage } from "../lib/api";
 import type { IntegrationStatus, PlanningProfile } from "../types/api";
 import { PreferenceSettings } from "../components/settings/PreferenceSettings";
+import { ContextSettings } from "../components/settings/ContextSettings";
 
 const DAYS = [
   "Monday",
@@ -409,6 +410,7 @@ export default function Settings() {
           </p>
         </Surface>
         <PreferenceSettings />
+        <ContextSettings />
       </div>
     </AppShell>
   );

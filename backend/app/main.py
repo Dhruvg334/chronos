@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.errors import ChronosError, HTTP_STATUS_BY_ERROR
 from app.core.observability import log_event, request_context_middleware, request_id_context
 from app.services.readiness import readiness_report
-from app.api.v1 import auth, commitments, calendar, drift, rescue, reflection, agent, intake, google, scheduling, command, demo, today, plan, projects, routines, week, recommendations, settings as settings_api
+from app.api.v1 import auth, commitments, calendar, context, drift, rescue, reflection, agent, intake, google, scheduling, command, demo, today, plan, projects, routines, week, recommendations, settings as settings_api
 
 app = FastAPI(
     title="ChronOS API",
@@ -68,6 +68,7 @@ app.include_router(routines.router, prefix="/api/v1/routines", tags=["routines"]
 app.include_router(week.router, prefix="/api/v1/week", tags=["week"])
 app.include_router(settings_api.router, prefix="/api/v1/settings", tags=["settings"])
 app.include_router(recommendations.router, prefix="/api/v1/recommendations", tags=["recommendations"])
+app.include_router(context.router, prefix="/api/v1/context", tags=["context"])
 from app.api.v1.focus_blocks import router as fb_router
 app.include_router(fb_router, prefix="/api/v1/focus-blocks", tags=["focus_blocks"])
 app.include_router(intake.router)

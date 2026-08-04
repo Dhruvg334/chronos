@@ -9,3 +9,5 @@ ChronOS uses one bounded orchestration runtime for model and tool workflows. Kno
 `WorkflowTraceRepository` creates, completes, and fails runs and appends concise events. Events contain operational facts and safe summaries, not raw prompts, provider payloads, secrets, or hidden reasoning.
 
 Intake is the representative end-to-end workflow: the injected repository creates the run, structured extraction consumes one request unit, the runtime persists its trace, and only user-approved drafts are persisted.
+
+Adaptive planning and recovery may receive an expiring context pack. The pack is a bounded, cited compilation of structured state, confirmed memory, and retrieved excerpts. Retrieved text is explicitly labeled untrusted in provider requests, cannot select permissions or authorize tools, and is omitted without blocking the workflow when retrieval fails. Deterministic feasibility and recommendation-first approval remain authoritative.

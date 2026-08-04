@@ -5,7 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header
 
-from app.api.dependencies import get_current_user, get_model_gateway, get_repositories
+from app.api.dependencies import get_current_user, get_embedding_gateway, get_model_gateway, get_repositories
+from app.embeddings.gateway import EmbeddingGateway
 from app.core.config import settings
 from app.core.errors import ChronosError, ErrorCode
 from app.core.observability import request_id_context
@@ -32,6 +33,7 @@ async def generate_rescue_plan(
     user_id: str = Depends(get_current_user),
     repositories: RepositorySet = Depends(get_repositories),
     gateway: ModelGateway = Depends(get_model_gateway),
+    embeddings: EmbeddingGateway = Depends(get_embedding_gateway),
 ) -> dict[str, Any]:
     return (await AdaptiveRecoveryWorkflow(
         gateway,
@@ -42,6 +44,7 @@ async def generate_rescue_plan(
             trace_repository=repositories.traces,
         ),
         repositories,
+        embeddings,
     ).recommend(user_id=user_id, commitment_id=commitment_id, request_id=request_id_context.get())).model_dump(mode="json")
 
 

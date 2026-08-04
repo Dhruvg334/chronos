@@ -22,6 +22,8 @@ Weekly Planning shows daily capacity, due outcomes, important unscheduled work, 
 
 Settings makes timezone, available days, working hours, focus limits, default focus duration, transition and daily reserves, optional protected time, and quick-task threshold editable and resettable. Calendar state distinguishes connected, disconnected, unavailable, and configuration missing without exposing provider errors.
 
+Memory and document context live as a secondary Settings surface, not primary navigation. Users can see confirmed and proposed memories, understand whether each was stated or inferred, inspect its source and confidence, correct wording with history, resolve conflicts, archive items, and export memory. Notes and documents show calm ready, duplicate, failed, and archived states without exposing vectors or provider payloads.
+
 ## Keep execution contextual
 
 Focus opens from Today and exposes duration, elapsed/remaining time, pause, resume, finish, stop with reason, and stuck options. Reflection appears while finishing or after stopping. Recovery appears only when risk makes it relevant. Neither is permanent primary navigation.
@@ -35,6 +37,8 @@ Strategy and recovery recommendations state why they apply, evidence, confidence
 Planning style, recommendation frequency, explanation detail, quick-task handling, focus durations, routine continuity, enabled strategies, and the internal approval boundary are explicit user preferences. Feedback records only concise recommendation context and user action—never prompts or hidden reasoning.
 
 Recovery stays contextual and calm: explain what changed, name the likely failure mode, show no more than three trade-off-bearing options, recommend one, and support approval, postponement, or dismissal in an accessible focused dialog.
+
+When retrieved context materially affects a recommendation, “Why this plan?” names the source and lets the user inspect the exact excerpt. When retrieval is unavailable, the explanation says structured constraints were used instead. Citations never display database identifiers, embeddings, or hidden reasoning.
 
 “Why this plan?” shows constraints, selection summary, deferred work, whether AI assisted, and the approval boundary. It never exposes raw prompts, internal trace payloads, or hidden reasoning. Adaptive planning shows one validated recommendation even when the model proposed several candidates.
 

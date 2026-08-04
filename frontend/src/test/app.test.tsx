@@ -29,12 +29,14 @@ let routines: Array<Record<string, unknown>>;
 let onboardingStatus: 'not_started' | 'in_progress' | 'completed' | 'skipped';
 let onboardingStep: number;
 let savedPreferences: Record<string, unknown> | null;
+let memoryItems: Array<Record<string, unknown>>;
+let knowledgeSources: Array<Record<string, unknown>>;
 
 const preferences = { planning_style: 'balanced' as const, recommendation_frequency: 'normal' as const, approval_strictness: 'always_ask' as const, internal_write_automation_enabled: false, preferred_focus_durations: [25,45,60], routine_continuity_preference: 'gentle' as const, quick_task_mode: 'batch' as const, strategy_preferences: ['eisenhower_triage','task_batching','continuity_recovery','focus_interval','constrained_day','quick_action','time_blocking'], explanation_detail: 'standard' as const };
 const planningProfile = { timezone: 'Asia/Kolkata', available_weekdays: [0, 1, 2, 3, 4, 5], working_start_time: '09:30:00', working_end_time: '18:30:00', daily_focus_limit_minutes: 300, default_focus_duration_minutes: 45, minimum_transition_buffer_minutes: 10, minimum_daily_unscheduled_buffer_minutes: 60, protected_interval_start: '13:00:00', protected_interval_end: '14:00:00', quick_task_threshold_minutes: 5, onboarding_status: 'completed' as const, onboarding_step: 3, onboarding_completed_at: '2026-08-04T00:00:00Z', ...preferences };
 
 function todayData(): TodayResponse {
-  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60, project: { id: 'p1', title: 'ChronOS Production Release' }, outcome: { id: 'o1', title: 'Stable authentication and session handling' } }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { recommendation_key: 'today:c1:calendar_disruption', commitment_id: 'c1', title: 'Adjust the plan calmly', what_changed: 'The current focus session no longer fits before the next meeting.', failure_mode: 'calendar_disruption', reason: 'The plan changed.', options: [{ id: 'shorter_block', title: 'Use the remaining short window', rationale: 'Protect only the time that fits.', tradeoff: 'Less progress now.', expected_impact: 'A smaller valid block', feasible: true, requires_approval: true }], recommended_option_id: 'shorter_block', requires_approval: true }, explanation: { detail: 'standard', constraints_considered: ['risk', 'deadline', 'calendar'], next_action_reason: 'Highest-ranked executable commitment.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true }, routines_due: [{ id: 'r1', title: 'Daily release review', preferred_time: '18:00', duration_minutes: 20, minimum_viable_version: '5-minute blocker review' }], focus_duration_options: [25,45,60], explanation_detail: 'standard' };
+  return { status: 'attention', status_message: 'One decision can make the plan workable.', next_action: { commitment_id: 'c1', title: 'Authentication regression fix', detail: 'Run the regression suite', estimated_minutes: 60, project: { id: 'p1', title: 'ChronOS Production Release' }, outcome: { id: 'o1', title: 'Stable authentication and session handling' } }, ordered_plan: [{ id: 'c1', kind: 'commitment', title: 'Authentication regression fix', commitment_id: 'c1', status: 'critical' }], attention_count: 1, strategy_recommendation: recommendation, pending_approval_count: 0, active_focus_session: active, recovery: { recommendation_key: 'today:c1:calendar_disruption', commitment_id: 'c1', title: 'Adjust the plan calmly', what_changed: 'The current focus session no longer fits before the next meeting.', failure_mode: 'calendar_disruption', reason: 'The plan changed.', options: [{ id: 'shorter_block', title: 'Use the remaining short window', rationale: 'Protect only the time that fits.', tradeoff: 'Less progress now.', expected_impact: 'A smaller valid block', feasible: true, requires_approval: true }], recommended_option_id: 'shorter_block', requires_approval: true }, explanation: { detail: 'standard', constraints_considered: ['risk', 'deadline', 'calendar'], next_action_reason: 'Highest-ranked executable commitment.', deferred: ['Slides'], changed: 'No plan changes were made.', ai_used: false, requires_approval: true, retrieval_available: true, sources: [{ source_id: 's1', source_title: 'Release criteria', source_type: 'note', excerpt: 'Stable authentication and verified rollback are required.', reason_selected: 'Matched the project completion criteria.', confidence: 'high', retrieval_method: 'hybrid', score: .04 }] }, routines_due: [{ id: 'r1', title: 'Daily release review', preferred_time: '18:00', duration_minutes: 20, minimum_viable_version: '5-minute blocker review' }], focus_duration_options: [25,45,60], explanation_detail: 'standard' };
 }
 
 function planData(): PlanResponse {
@@ -56,8 +58,15 @@ beforeEach(() => {
   onboardingStatus = 'completed';
   onboardingStep = 3;
   savedPreferences = null;
+  memoryItems = [{ id: 'm1', category: 'working_pattern', content: 'I underestimated authentication debugging twice.', source_type: 'reflection', source_reference: { label: 'Proposed from a reflection' }, confidence: .65, is_explicit: false, status: 'proposed', conflicts: [] }];
+  knowledgeSources = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith('/api/v1/context/memory') && init?.method === 'POST') { const body = JSON.parse(String(init.body)); const item = { id: 'm2', ...body, source_type: 'user', source_reference: { label: 'Added by you' }, confidence: 1, is_explicit: true, status: 'confirmed', conflicts: [] }; memoryItems.push(item); return json(item, 201); }
+    if (url.endsWith('/api/v1/context/memory')) return json({ items: memoryItems });
+    if (url.includes('/api/v1/context/memory/') && url.endsWith('/decision')) { const id = url.split('/').at(-2); const body = JSON.parse(String(init?.body)); memoryItems = memoryItems.map((item) => item.id === id ? { ...item, status: body.decision === 'confirm' ? 'confirmed' : body.decision === 'reject' ? 'rejected' : 'archived' } : item); return json(memoryItems.find((item) => item.id === id)); }
+    if (url.endsWith('/api/v1/context/knowledge/text')) { const body = JSON.parse(String(init?.body)); const source = { id: 's1', title: body.title, source_type: 'note', status: 'ready', original_metadata: {}, checksum: 'a'.repeat(64) }; knowledgeSources.push(source); return json({ status: 'ready', source_id: 's1', chunk_count: 1 }, 201); }
+    if (url.endsWith('/api/v1/context/knowledge')) return json({ sources: knowledgeSources });
     if (url.endsWith('/api/v1/settings/onboarding/skip')) { onboardingStatus = 'skipped'; return json({ ...planningProfile, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); }
     if (url.endsWith('/api/v1/settings/onboarding/reopen')) { onboardingStatus = 'in_progress'; onboardingStep = 1; return json({ ...planningProfile, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); }
     if (url.endsWith('/api/v1/settings/onboarding')) { if (init?.method === 'PUT') { const body = JSON.parse(String(init.body)); onboardingStatus = body.complete ? 'completed' : 'in_progress'; onboardingStep = body.onboarding_step; return json({ ...planningProfile, ...body, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); } return json({ ...planningProfile, onboarding_status: onboardingStatus, onboarding_step: onboardingStep }); }
@@ -228,6 +237,26 @@ it('persists personalization controls and keeps internal automation opt-in', asy
   expect(savedPreferences).toMatchObject({ planning_style: 'minimal', internal_write_automation_enabled: false });
 });
 
+it('reviews proposed memory, confirms it, and adds explicit context', async () => {
+  const user = userEvent.setup(); renderWithContext(<Settings />);
+  expect(await screen.findByText('I underestimated authentication debugging twice.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Confirm' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Memory updated');
+  await user.type(screen.getByLabelText('What should ChronOS remember?'), 'I prefer 45-minute focus blocks.');
+  await user.click(screen.getByRole('button', { name: 'Add memory' }));
+  expect(await screen.findByText('I prefer 45-minute focus blocks.')).toBeInTheDocument();
+}, 10_000);
+
+it('ingests a note and shows a safe knowledge-source state', async () => {
+  const user = userEvent.setup(); renderWithContext(<Settings />);
+  await user.type(await screen.findByLabelText('Note title'), 'Release criteria');
+  await user.type(screen.getByLabelText('Note'), 'Stable authentication and verified rollback are required.');
+  await user.click(screen.getByRole('button', { name: 'Add note' }));
+  expect(await screen.findByText('Note added to your context.')).toBeInTheDocument();
+  expect(await screen.findByText('Release criteria')).toBeInTheDocument();
+  expect(screen.queryByText(/embedding/i)).not.toBeInTheDocument();
+}, 10_000);
+
 it('shows honest profile-only integration state', async () => {
   renderWithContext(<Settings />);
   expect(await screen.findByText('unavailable')).toBeInTheDocument();
@@ -250,10 +279,13 @@ it('renders Strategy Engine evidence, confidence, and automation boundary', asyn
 
 it('shows compact plan transparency without hidden reasoning', async () => {
   const user = userEvent.setup(); renderWithContext(<Today />);
-  await user.click(await screen.findByText('Why this plan?'));
+  await user.click(await screen.findByText('Why this plan?', { selector: 'summary' }));
   expect(await screen.findByRole('heading', { name: 'Why this plan?' })).toBeInTheDocument();
   expect(screen.getByText('Deterministic')).toBeInTheDocument();
   expect(screen.getByText(/still requires your approval/i)).toBeInTheDocument();
+  await user.click(screen.getByText('Sources used'));
+  expect(screen.getByText('Based on Release criteria')).toBeInTheDocument();
+  expect(screen.getByText('Stable authentication and verified rollback are required.')).toBeInTheDocument();
 });
 
 it('prepares and explicitly approves a validated adaptive plan', async () => {

@@ -244,7 +244,13 @@ export interface PlanExplanation {
   changed: string;
   ai_used: boolean;
   requires_approval: boolean;
+  sources?: ContextCitation[];
+  retrieval_available?: boolean;
 }
+
+export interface ContextCitation { source_id: string; source_title: string; source_type: string; excerpt: string; reason_selected: string; confidence: 'low' | 'medium' | 'high'; retrieval_method: 'hybrid' | 'memory' | 'structured' | 'history'; score: number }
+export interface MemoryItem { id: string; project_id?: string | null; category: 'preference' | 'constraint' | 'working_pattern' | 'project_fact' | 'personal_rule' | 'decision'; content: string; source_type: string; source_reference: { label?: string; correction_history?: Array<{ content: string; corrected_at: string }> }; confidence: number; is_explicit: boolean; status: 'proposed' | 'confirmed' | 'rejected' | 'archived' | 'expired'; effective_date?: string | null; review_at?: string | null; expires_at?: string | null; conflicts?: Array<{ id: string; content: string; message: string }> }
+export interface KnowledgeSource { id: string; project_id?: string | null; source_type: 'note' | 'document' | 'pasted_text' | 'project_context'; title: string; status: 'processing' | 'ready' | 'failed' | 'archived'; original_metadata: Record<string, unknown>; checksum: string; failure_code?: string | null; created_at?: string }
 
 export interface AdaptivePlanResponse {
   workflow_id: string;

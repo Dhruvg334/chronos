@@ -17,6 +17,18 @@ class Settings(BaseSettings):
     WORKFLOW_MAX_STEPS: int = 6
     WORKFLOW_TIMEOUT_SECONDS: float = 45.0
     WORKFLOW_REQUEST_BUDGET: int = 4
+
+    # Provider-neutral embeddings. The local hash provider is an offline fallback,
+    # while Hugging Face can be enabled explicitly for semantic embeddings.
+    EMBEDDING_PROVIDER: str = "local_hash"
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_BASE_URL: str = "https://api-inference.huggingface.co/pipeline/feature-extraction"
+    EMBEDDING_DIMENSIONS: int = 384
+    EMBEDDING_REQUEST_TIMEOUT_SECONDS: float = 20.0
+    EMBEDDING_MAX_RETRIES: int = 1
+    KNOWLEDGE_MAX_FILE_BYTES: int = 5_000_000
+    CONTEXT_PACK_TOKEN_BUDGET: int = 1800
     
     # Supabase Connection Keys
     SUPABASE_URL: str = ""

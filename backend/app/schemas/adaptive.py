@@ -32,6 +32,8 @@ class PlanExplanation(BaseModel):
     changed: str = Field(max_length=300)
     ai_used: bool
     requires_approval: bool = True
+    sources: list[dict] = Field(default_factory=list, max_length=8)
+    retrieval_available: bool = True
 
 
 class ValidatedPlan(BaseModel):
@@ -97,3 +99,5 @@ class AdaptiveRecoveryResponse(BaseModel):
     diagnosis: RecoveryCause
     proposals: list[dict]
     ai_used: bool
+    sources: list[dict] = Field(default_factory=list, max_length=8)
+    retrieval_available: bool = True

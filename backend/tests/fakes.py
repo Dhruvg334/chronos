@@ -207,6 +207,51 @@ class MemoryFeedback(MemoryOwned):
     def list_for_user(self, user_id, limit=50): return super().list_for_user(user_id)[-limit:]
 
 
+class MemoryItems(MemoryOwned):
+    def list_for_user(self, user_id, category=None, project_id=None):
+        rows = super().list_for_user(user_id)
+        if category: rows = [row for row in rows if row.get("category") == category]
+        if project_id: rows = [row for row in rows if str(row.get("project_id")) == str(project_id)]
+        return rows
+
+
+class MemoryKnowledge:
+    def __init__(self, sources=None, chunks=None):
+        self.sources = list(sources or []); self.chunks = list(chunks or []); self.receipts = {}
+    def list_sources(self, user_id, project_id=None):
+        return [row for row in self.sources if row.get("user_id") == user_id and (project_id is None or str(row.get("project_id")) == str(project_id))]
+    def get_source(self, user_id, source_id):
+        return next((row for row in self.list_sources(user_id) if str(row["id"]) == str(source_id)), None)
+    def create_failed_source(self, user_id, data):
+        row = {**data, "user_id": user_id, "status": "failed"}; self.sources.append(row); return row
+    def update_source(self, user_id, source_id, data):
+        row = self.get_source(user_id, source_id)
+        if row is None: raise RuntimeError("not found")
+        row.update(data); return row
+    def ingest(self, user_id, idempotency_key, source, chunks):
+        if idempotency_key in self.receipts: return {**self.receipts[idempotency_key], "idempotent_replay": True}
+        duplicate = next((row for row in self.list_sources(user_id) if row["checksum"] == source["checksum"] and row.get("project_id") == source.get("project_id") and row.get("status") != "archived"), None)
+        if duplicate: result = {"status": "duplicate", "source_id": duplicate["id"], "chunk_count": 0, "idempotent_replay": False}
+        else:
+            row = {**source, "user_id": user_id, "status": "ready"}; self.sources.append(row)
+            self.chunks.extend([{**chunk, "source_id": source["id"], "user_id": user_id, "project_id": source.get("project_id")} for chunk in chunks])
+            result = {"status": "ready", "source_id": source["id"], "chunk_count": len(chunks), "idempotent_replay": False}
+        self.receipts[idempotency_key] = result; return result
+    def retrieve(self, user_id, query, query_embedding, project_id, limit):
+        terms = set(query.casefold().split()); ranked = []
+        for chunk in self.chunks:
+            if chunk.get("user_id") != user_id or (project_id and str(chunk.get("project_id")) != str(project_id)): continue
+            overlap = len(terms & set(chunk["content"].casefold().split()))
+            source = self.get_source(user_id, chunk["source_id"])
+            score = overlap + (0.2 if source and source.get("source_type") == "project_context" else 0)
+            ranked.append({"chunk_id": chunk["id"], "source_id": chunk["source_id"], "project_id": chunk.get("project_id"), "title": source["title"], "source_type": source["source_type"], "excerpt": chunk["content"][:600], "score": score, "dense_rank": len(ranked)+1, "lexical_rank": 1 if overlap else None, "created_at": chunk.get("created_at")})
+        return sorted(ranked, key=lambda row: (-row["score"], row["chunk_id"]))[:limit]
+
+
+class MemoryContextPacks(MemoryOwned):
+    pass
+
+
 class MemoryOutcomes(MemoryOwned):
     def __init__(self, rows=None): super().__init__(rows); self.commitments = None
     def list_for_user(self, user_id, project_id=None):
@@ -248,11 +293,17 @@ class MemoryWeeklyPlans(MemoryOwned):
         result = {"status": "approved", "block_ids": block_ids, "idempotent_replay": False}; self.receipts[idempotency_key] = result; return result
 
 
-def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None, projects=None, outcomes=None, routines=None, weekly_plans=None, feedback=None):
+def repositories(*, commitments=None, focus=None, planning=None, reflections=None, traces=None, profiles=None, google=None, projects=None, outcomes=None, routines=None, weekly_plans=None, feedback=None, memory=None, knowledge=None, context_packs=None):
     commitments = commitments or MemoryCommitments(); focus = focus or MemoryFocus(); planning = planning or MemoryPlanning(); reflections = reflections or MemoryReflections(); traces = traces or MemoryTraces()
     commitments.traces = traces
     focus.commitments = commitments; focus.reflections = reflections
     planning.focus = focus; planning.traces = traces
     projects = projects or MemoryProjects(); outcomes = outcomes or MemoryOutcomes(); routines = routines or MemoryRoutines(); weekly_plans = weekly_plans or MemoryWeeklyPlans()
     outcomes.commitments = commitments; weekly_plans.focus = focus; commitments.outcomes = outcomes; commitments.routines = routines
-    return RepositorySet(commitments, focus, planning, reflections, traces, google or MemoryGoogle(), profiles or MemoryPlanningProfiles(), projects, outcomes, routines, weekly_plans, feedback or MemoryFeedback())
+    return RepositorySet(
+        commitments=commitments, focus=focus, planning=planning, reflections=reflections, traces=traces,
+        google_connections=google or MemoryGoogle(), planning_profiles=profiles or MemoryPlanningProfiles(),
+        projects=projects, outcomes=outcomes, routines=routines, weekly_plans=weekly_plans,
+        feedback=feedback or MemoryFeedback(), memory=memory or MemoryItems(),
+        knowledge=knowledge or MemoryKnowledge(), context_packs=context_packs or MemoryContextPacks(),
+    )

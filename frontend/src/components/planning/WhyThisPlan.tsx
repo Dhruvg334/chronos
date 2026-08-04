@@ -21,6 +21,23 @@ export function WhyThisPlan({ explanation }: { explanation: PlanExplanation }) {
       {explanation.requires_approval && (
         <p className="mt-3 text-xs font-medium text-accent-strong">Any plan change still requires your approval.</p>
       )}
+      {explanation.sources && explanation.sources.length > 0 && (
+        <details className="mt-4 border-t border-line pt-3">
+          <summary className="cursor-pointer text-sm font-medium">Sources used</summary>
+          <div className="mt-3 space-y-3">
+            {explanation.sources.map((source) => (
+              <div key={`${source.source_id}-${source.excerpt}`} className="rounded-lg bg-surface-subtle p-3">
+                <p className="text-sm font-medium">Based on {source.source_title}</p>
+                <p className="mt-1 text-xs text-muted">{source.reason_selected}</p>
+                <blockquote className="mt-2 border-l-2 border-accent pl-3 text-sm text-muted">{source.excerpt}</blockquote>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+      {explanation.retrieval_available === false && (
+        <p className="mt-3 text-xs text-muted">Document context was unavailable. This plan still uses your structured constraints.</p>
+      )}
     </Surface>
   );
 }

@@ -4,6 +4,7 @@ import os
 
 from app.core.supabase import get_supabase_client
 from app.models.gateway import ModelGateway
+from app.embeddings.gateway import EmbeddingGateway
 from app.repositories.protocols import RepositorySet
 from app.repositories.supabase import create_repository_set
 from app.core.container import container
@@ -66,3 +67,7 @@ def get_repositories() -> RepositorySet:
 
 def get_model_gateway() -> ModelGateway:
     return container.model_gateway()
+
+
+def get_embedding_gateway() -> EmbeddingGateway:
+    return container.embedding_gateway()

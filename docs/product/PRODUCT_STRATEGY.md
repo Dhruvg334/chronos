@@ -15,3 +15,5 @@ Automation is recommendation-first. Internal reading and suggestion generation m
 The responsive web application supports capture, Today, daily and weekly planning, projects, outcomes, routines, and focused execution. Projects organize meaningful completed states rather than acting as generic folders; routines represent recurring behaviour without punitive streak mechanics. Desktop and native mobile clients are later work. Supabase remains the cloud-first data and authentication platform, with portability and self-hosting kept as architectural requirements.
 
 The core remains open source. Hosted-service quotas and operating-cost controls may be added later without placing core planning logic behind proprietary infrastructure.
+
+Durable context supports this promise without turning ChronOS into an opaque assistant. User-confirmed memory, project facts, decisions, notes, and documents remain inspectable and attributable. Retrieval improves explanations and candidate quality, but planning stays useful without it and deterministic feasibility remains authoritative.
