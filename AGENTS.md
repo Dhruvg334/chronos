@@ -15,9 +15,9 @@ ChronOS turns scattered commitments, time constraints, and observed work pattern
 
 ## Commands
 
-Backend: `cd backend`; `pip install -r requirements.txt`; `python -m pytest`; `python -m pytest -m integration`; `python -m uvicorn app.main:app --reload`.
+Backend: `cd backend`; `python -m pytest`; `python -m pytest -m integration`; `python -m uvicorn app.main:app --reload`. Install from `requirements.txt` and `requirements-dev.txt` only on first setup or when dependency manifests change.
 
-Frontend: `cd frontend`; `npm ci`; `npm run typecheck`; `npm run lint`; `npm run test -- --run`; `npm run build`; `npm run dev`.
+Frontend: `cd frontend`; `npm run typecheck`; `npm run lint`; `npm run test -- --run`; `npm run build`; `npm run dev`. Run `npm install` only on first setup or when `package.json` or the lockfile changes.
 
 ## Invariants
 

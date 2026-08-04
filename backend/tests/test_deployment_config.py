@@ -35,7 +35,7 @@ def test_backend_start_command_and_dependency_free_liveness():
     assert command == "web: uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     response = TestClient(app).get("/api/v1/health/live")
     assert response.status_code == 200
-    assert response.json()["status"] == "alive"
+    assert response.json() == {"status": "alive"}
 
 
 def test_adaptive_plan_hardening_is_forward_only_and_restricts_execution():

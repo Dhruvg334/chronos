@@ -32,4 +32,4 @@ Incidents are correlated by request/workflow ID, classified by the shared taxono
 
 ## Legacy isolation
 
-The application no longer mounts legacy command, scheduling, drift, agent-console, or demo route families. Today, Plan, Recovery, traces, and integrations use application services and repositories. The old `user_memory` table and compatibility Python modules remain inactive for data preservation and rollback analysis; current routes do not import them. Removal requires a separate verified retention decision.
+The backend no longer mounts legacy command, scheduling, drift, or backend demo route families. The frontend `/demo` route is a static public product preview and does not access user data or protected APIs. Today, Plan, Recovery, traces, and integrations use application services and repositories. The old `user_memory` table and compatibility Python modules remain isolated for data preservation and rollback analysis; active core routes do not depend on the legacy command, scheduling, or rescue graphs. Removal requires a separate verified retention decision.

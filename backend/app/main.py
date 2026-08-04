@@ -43,7 +43,7 @@ async def chronos_error_handler(request: Request, exc: ChronosError):
 
 @app.get("/api/v1/health/live")
 async def liveness():
-    return {"status": "alive", "environment": settings.ENV}
+    return {"status": "alive"}
 
 
 @app.get("/api/v1/health/ready")

@@ -1,32 +1,36 @@
-# React + TypeScript + Vite
+# ChronOS frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The frontend is a React and TypeScript single-page application built with Vite. It owns authentication-aware navigation, product presentation, accessibility, and client-side server-state coordination through TanStack Query.
 
-Currently, two official plugins are available:
+## Environment
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Copy `.env.example` to `.env` and configure only the public browser values:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```env
+VITE_API_URL=http://127.0.0.1:8000
+VITE_SUPABASE_URL=http://127.0.0.1:55321
+VITE_SUPABASE_ANON_KEY=...
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Never place service-role, model-provider, OAuth client-secret, encryption, or integration credentials in the frontend environment.
+
+## Commands
+
+```powershell
+npm run dev
+npm run typecheck
+npm run lint
+npm run test -- --run
+npm run build
+```
+
+Install dependencies on first setup or after `package.json` or `package-lock.json` changes.
+
+## Application surfaces
+
+- Public: landing, guide, static demo, login, and signup
+- Primary authenticated navigation: Today, Inbox, and Plan
+- Contextual planning: Week, Projects, Outcomes, Routines, Focus, Recovery, and Reflection
+- Utility: onboarding, preferences, memory and knowledge, integrations, data controls, and operational traces
+
+Private query data is cleared on logout. Protected API calls use the active Supabase access token through the shared `apiFetch` helper.

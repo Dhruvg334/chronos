@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiUrl, apiFetch as fetch, getApiErrorMessage } from '../../lib/api';
+import { apiFetch, apiUrl, getApiErrorMessage } from '../../lib/api';
 import type { CommitmentDraft, ApproveCommitmentsRequest } from '../../types/api';
 import { CommitmentDraftCard } from './CommitmentDraftCard';
 import { WorkflowTracePanel } from './WorkflowTracePanel';
@@ -17,8 +17,8 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({ agentRunId, 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newProjectTitle, setNewProjectTitle] = useState('');
-  const projects = useQuery({ queryKey: ['projects'], queryFn: async () => { const response = await fetch(apiUrl('/api/v1/projects')); if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Projects are unavailable.')); return response.json() as Promise<{ projects: Array<{ id: string; title: string }> }>; } });
-  const createProject = useMutation({ mutationFn: async () => { const response = await fetch(apiUrl('/api/v1/projects'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newProjectTitle, description: '', status: 'active', colour: 'accent' }) }); if (!response.ok) throw new Error(await getApiErrorMessage(response, 'The project could not be created.')); return response.json(); }, onSuccess: async () => { setNewProjectTitle(''); await queryClient.invalidateQueries({ queryKey: ['projects'] }); } });
+  const projects = useQuery({ queryKey: ['projects'], queryFn: async () => { const response = await apiFetch(apiUrl('/api/v1/projects')); if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Projects are unavailable.')); return response.json() as Promise<{ projects: Array<{ id: string; title: string }> }>; } });
+  const createProject = useMutation({ mutationFn: async () => { const response = await apiFetch(apiUrl('/api/v1/projects'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newProjectTitle, description: '', status: 'active', colour: 'accent' }) }); if (!response.ok) throw new Error(await getApiErrorMessage(response, 'The project could not be created.')); return response.json(); }, onSuccess: async () => { setNewProjectTitle(''); await queryClient.invalidateQueries({ queryKey: ['projects'] }); } });
 
   const handleUpdate = (index: number, updatedDraft: CommitmentDraft) => {
     const newDrafts = [...drafts];
@@ -44,7 +44,7 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({ agentRunId, 
         approved_drafts: drafts
       };
 
-      const response = await fetch(apiUrl('/api/v1/ai/intake/approve'), {
+      const response = await apiFetch(apiUrl('/api/v1/ai/intake/approve'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

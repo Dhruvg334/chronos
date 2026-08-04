@@ -1,6 +1,6 @@
 # Security Model
 
-Migrations `001` through `027` are immutable. Migration `028` adds owner-scoped operational audit data, atomic quota accounting, lifecycle RPCs, restricted grants, and bounded retention. Later security changes require another forward migration.
+Migrations `001` through `028` are immutable. Migration `028` adds owner-scoped operational audit data, atomic quota accounting, lifecycle RPCs, restricted grants, and bounded retention. Later security changes require another forward migration.
 
 Frontend hosting sends CSP, frame, MIME, referrer, and permissions headers. Backend trusted hosts and exact CORS origins are environment-configured; a preview regex must be anchored HTTPS without broad wildcards. External source URLs require HTTPS and reject credentials and private literal addresses. MCP endpoints additionally require an explicit host allow-list.
 
@@ -13,7 +13,7 @@ Frontend hosting sends CSP, frame, MIME, referrer, and permissions headers. Back
 - Return stable public errors with request IDs. Keep diagnostic context in redacted structured logs.
 - Keep `/demo` static and isolated from user workspaces.
 
-Applied migrations 001–026 are immutable. Migration 017 protects OAuth tokens through Vault; its historical SQL text is retained because changing applied migration history is prohibited.
+Migration 017 protects OAuth tokens through Vault; its historical SQL text is retained because changing applied migration history is prohibited.
 
 Core transaction functions use restricted `SECURITY DEFINER` search paths. Migration 023 narrows `approve_adaptive_plan_transaction` to `pg_catalog` only; every application and authentication object remains explicitly schema-qualified. The functions validate ownership, lock per idempotency key, and revoke execution from `PUBLIC` and `anon`. Only `authenticated` and `service_role` can execute them. RLS remains enabled on operation receipts and every user-owned core table.
 
@@ -30,3 +30,5 @@ Google authorization remains read-only. OAuth state is signed and short-lived; a
 Migration 027 adds owner-scoped integration connections, normalized items, action proposals, and audits. Composite ownership constraints prevent cross-user links. Authenticated reads are column-limited and exclude token references, cursors, raw metadata, validated payloads, and idempotency keys. Writes stay behind repositories or the atomic approval function. The migration also replaces Google Vault functions with explicitly qualified objects and a `pg_catalog` search path while preserving service-role-only token access.
 
 MCP tools use the typed permission registry. Configurable endpoints require exact HTTPS allow-listing and reject URL credentials, non-443 ports, private/loopback/link-local literal addresses, disabled servers, undeclared tools, invalid schemas, and write permissions. Remote MCP network execution is disabled by default. External content never grants permissions.
+
+Migration 028 adds owner-scoped usage counters and operational audit events, service-only atomic quota consumption, account inventory and deletion, knowledge-source deletion, retention cleanup, and Vault-token cleanup. Lifecycle and quota functions use restricted search paths, narrow grants, ownership checks, and transactional cleanup. Public health responses expose no environment, account, credential, or infrastructure detail.
