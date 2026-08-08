@@ -47,3 +47,15 @@ def test_adaptive_plan_hardening_is_forward_only_and_restricts_execution():
     assert "REVOKE ALL ON FUNCTION public.approve_adaptive_plan_transaction" in normalized
     assert "FROM PUBLIC, anon" in normalized
     assert "TO authenticated, service_role" in normalized
+
+def test_render_hostname_can_be_trusted(monkeypatch):
+    monkeypatch.setenv("RENDER_EXTERNAL_HOSTNAME", "chronos-test.onrender.com")
+
+    configured = ["localhost", "127.0.0.1"]
+    render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+
+    allowed_hosts = list(configured)
+    if render_hostname and render_hostname not in allowed_hosts:
+        allowed_hosts.append(render_hostname)
+
+    assert "chronos-test.onrender.com" in allowed_hosts
