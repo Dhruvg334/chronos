@@ -1,36 +1,61 @@
-import { ArrowRight, Github, ShieldCheck, Sparkles, TimerReset } from 'lucide-react';
+import { ArrowRight, Check, ShieldCheck, Sparkles, TimerReset } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../components/auth/auth-context';
 
-const navItems = [
-  { href: '#product', label: 'Product' },
-  { href: '#how-it-works', label: 'How it works' },
-  { href: '#control', label: 'Safety' },
-  { href: '/guide', label: 'About' },
+const principles = [
+  'Capacity-aware',
+  'Approval-first',
+  'Adaptive recovery',
 ];
 
-const steps = [
+const flow = [
   {
-    number: '01',
-    title: 'Capture the reality',
-    text: 'Bring in commitments, projects, routines, and calendar constraints without turning capture into another planning task.',
+    step: '01',
+    title: 'Capture what is real',
+    text: 'Commitments, outcomes, routines, dependencies, and calendar constraints enter one planning context.',
   },
   {
-    number: '02',
-    title: 'Validate the plan',
-    text: 'ChronOS checks capacity, protected time, dependencies, buffers, and deadlines before a suggestion can become your plan.',
+    step: '02',
+    title: 'Build only what fits',
+    text: 'ChronOS validates availability, buffers, protected time, focus limits, deadlines, and blocked work before a plan can be accepted.',
   },
   {
-    number: '03',
+    step: '03',
     title: 'Recover without chaos',
-    text: 'When the day changes, get a small set of feasible options with the trade-offs made explicit. You remain in control.',
+    text: 'When the day changes, ChronOS proposes a small set of feasible alternatives and keeps consequential changes behind approval.',
   },
 ];
 
-function BrandMark({ className = '' }: { className?: string }) {
+
+function RepositoryMark() {
   return (
-    <span className={`inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-[12px] bg-[#1f1f1c] ${className}`} aria-hidden="true">
-      <img src="/chronos-mark.svg" alt="" className="h-7 w-7" />
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[17px] w-[17px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="7" cy="6" r="2" />
+      <circle cx="17" cy="18" r="2" />
+      <circle cx="7" cy="18" r="2" />
+      <path d="M7 8v8" />
+      <path d="M9 6h3a5 5 0 0 1 5 5v5" />
+    </svg>
+  );
+}
+
+function ChronOSMark({ size = 38 }: { size?: number }) {
+  return (
+    <span
+      className="inline-grid shrink-0 place-items-center rounded-[11px] bg-accent shadow-[0_8px_24px_rgba(198,106,30,0.18)]"
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    >
+      <img src="/chronos-mark.svg" alt="" className="h-[72%] w-[72%]" />
     </span>
   );
 }
@@ -40,34 +65,32 @@ export default function Landing() {
   const primaryDestination = session ? '/today' : '/signup';
 
   return (
-    <div className="landing-page min-h-screen bg-[#faf9f7] text-ink">
-      <header className="landing-nav-wrap">
-        <nav className="landing-nav" aria-label="Landing navigation">
-          <Link to="/" className="landing-brand" aria-label="ChronOS home">
-            <BrandMark />
-            <span>Chron<span className="text-accent">OS</span></span>
+    <div className="landing-v3 min-h-screen bg-[#FAFAF8] text-ink">
+      <header className="border-b border-line/80 bg-[#FAFAF8]/95 backdrop-blur">
+        <nav className="mx-auto flex h-[72px] w-full max-w-[1180px] items-center justify-between px-5 sm:px-7" aria-label="Landing navigation">
+          <Link to="/" className="inline-flex items-center gap-3 no-underline" aria-label="ChronOS home">
+            <ChronOSMark />
+            <span className="text-[18px] font-semibold tracking-[-0.035em] text-ink">Chron<span className="text-accent">OS</span></span>
           </Link>
 
-          <div className="landing-nav-links" aria-label="Product links">
-            {navItems.map((item) => item.href.startsWith('/') ? (
-              <Link key={item.label} to={item.href} className="landing-nav-link">{item.label}</Link>
-            ) : (
-              <a key={item.label} href={item.href} className="landing-nav-link">{item.label}</a>
-            ))}
+          <div className="hidden items-center gap-8 text-sm font-medium text-muted md:flex">
+            <a href="#how" className="transition hover:text-ink">How it works</a>
+            <a href="#trust" className="transition hover:text-ink">Design principles</a>
+            <Link to="/guide" className="transition hover:text-ink">About</Link>
           </div>
 
-          <div className="landing-nav-actions">
+          <div className="flex items-center gap-2">
             <a
-              className="landing-icon-link"
               href="https://github.com/Dhruvg334/ChronOS"
               target="_blank"
               rel="noreferrer"
               aria-label="ChronOS on GitHub"
+              className="hidden h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-ink transition hover:border-[#D2D2CC] hover:bg-surface-subtle sm:inline-flex"
             >
-              <Github className="h-[18px] w-[18px]" />
+              <RepositoryMark />
             </a>
-            {!session && <Link to="/login" className="landing-login-link">Log in</Link>}
-            <Link to={primaryDestination} className="landing-cta landing-cta-compact">
+            {!session && <Link to="/login" className="hidden rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:text-ink sm:inline-flex">Log in</Link>}
+            <Link to={primaryDestination} className="inline-flex min-h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent-strong">
               {session ? 'Open ChronOS' : 'Start planning'}
             </Link>
           </div>
@@ -75,146 +98,129 @@ export default function Landing() {
       </header>
 
       <main>
-        <section id="product" className="landing-hero" aria-labelledby="landing-title">
-          <div className="landing-ambient landing-ambient-left" aria-hidden="true" />
-          <div className="landing-ambient landing-ambient-right" aria-hidden="true" />
+        <section className="landing-v3-hero relative overflow-hidden border-b border-line/80">
+          <div className="landing-v3-aura landing-v3-aura-left" aria-hidden="true" />
+          <div className="landing-v3-aura landing-v3-aura-right" aria-hidden="true" />
 
-          <div className="landing-hero-inner">
-            <div className="landing-kicker motion-pop">
-              <span className="landing-kicker-dot" aria-hidden="true" />
-              Capacity-aware planning, built around your approval
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          <div className="relative mx-auto flex min-h-[calc(100svh-72px)] w-full max-w-[1120px] flex-col items-center justify-center px-5 py-14 text-center sm:px-7 lg:min-h-[690px]">
+            <div className="landing-v3-enter inline-flex items-center gap-2 rounded-full border border-[#E7DED5] bg-white/80 px-3 py-1.5 text-[12px] font-semibold text-[#665E57] shadow-[0_6px_20px_rgba(45,38,31,0.04)]">
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-accent-soft text-accent-strong"><Check className="h-3 w-3" strokeWidth={2.8} /></span>
+              A personal execution system for realistic days
             </div>
 
-            <h1 id="landing-title" className="landing-title motion-enter">
-              Make plans that survive<br />
-              <span className="landing-title-accent">the real day.</span>
+            <h1
+              aria-label="Plan the day you can actually execute."
+              className="landing-v3-enter landing-v3-delay-1 mt-8 max-w-[980px] text-balance text-[clamp(3.35rem,7vw,6.75rem)] font-[620] leading-[0.92] tracking-[-0.06em] text-[#11110F]"
+            >
+              Plan the day you can
+              <span className="block text-accent">actually execute.</span>
             </h1>
 
-            <p className="landing-subtitle motion-enter">
-              ChronOS turns commitments, project outcomes, routines, and calendar constraints into a realistic plan — then helps you recover when reality changes.
+            <p className="landing-v3-enter landing-v3-delay-2 mt-7 max-w-[720px] text-balance text-[clamp(1rem,1.35vw,1.2rem)] leading-8 text-muted">
+              ChronOS turns commitments, projects, routines, and calendar constraints into a plan that fits — then helps you recover when reality changes.
             </p>
 
-            <div className="landing-hero-actions motion-enter">
-              <Link to={primaryDestination} className="landing-cta">
+            <div className="landing-v3-enter landing-v3-delay-3 mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <Link to={primaryDestination} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(198,106,30,0.2)] transition hover:-translate-y-0.5 hover:bg-accent-strong">
                 {session ? 'Open your day' : 'Start planning'}
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/demo" className="landing-secondary-cta">
+              <Link to="/demo" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line bg-white px-5 text-sm font-semibold text-ink transition hover:-translate-y-0.5 hover:bg-surface-subtle">
                 See a sample day
               </Link>
             </div>
 
-            <div className="landing-proof motion-enter" aria-label="ChronOS principles">
-              <span><span className="landing-check" aria-hidden="true">✓</span> Capacity-aware</span>
-              <span className="landing-proof-separator" aria-hidden="true">•</span>
-              <span><span className="landing-check" aria-hidden="true">✓</span> Approval-first</span>
-              <span className="landing-proof-separator" aria-hidden="true">•</span>
-              <span><span className="landing-check" aria-hidden="true">✓</span> Adaptive recovery</span>
-            </div>
-
-            <div className="landing-plan-ribbon" aria-label="Example validated day">
-              <div className="landing-ribbon-meta">
-                <span>Thursday</span>
-                <strong>5h 10m usable</strong>
-              </div>
-              <div className="landing-ribbon-track">
-                <div className="landing-ribbon-block landing-ribbon-focus" style={{ flex: 4.1 }}>
-                  <span>09:30</span>
-                  <strong>Authentication regression fix</strong>
-                </div>
-                <div className="landing-ribbon-block landing-ribbon-event" style={{ flex: 2.15 }}>
-                  <span>11:00</span>
-                  <strong>Team sync</strong>
-                </div>
-                <div className="landing-ribbon-block landing-ribbon-work" style={{ flex: 2.5 }}>
-                  <span>12:10</span>
-                  <strong>Deployment review</strong>
-                </div>
-                <div className="landing-ribbon-buffer" style={{ flex: 1.15 }}>
-                  <span>Buffer</span>
-                </div>
-              </div>
-              <div className="landing-ribbon-note">
-                <span>Validated against calendar, focus limit, transitions, and protected time.</span>
-                <span className="landing-workable">Workable</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="how-it-works" className="landing-section landing-how" aria-labelledby="how-title">
-          <div className="landing-section-inner">
-            <div className="landing-section-heading">
-              <p className="landing-section-eyebrow">How it works</p>
-              <h2 id="how-title">Planning is a constraint problem.<br />ChronOS treats it like one.</h2>
-              <p>AI helps with interpretation and trade-offs. Deterministic rules decide whether a plan can actually fit.</p>
-            </div>
-
-            <div className="landing-steps">
-              {steps.map((step) => (
-                <article key={step.number} className="landing-step">
-                  <div className="landing-step-number">{step.number}</div>
-                  <h3>{step.title}</h3>
-                  <p>{step.text}</p>
-                </article>
+            <div className="landing-v3-enter landing-v3-delay-4 mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12px] font-medium text-[#77736D]" aria-label="ChronOS principles">
+              {principles.map((item) => (
+                <span key={item} className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
+                  {item}
+                </span>
               ))}
             </div>
+
+            <div className="landing-v3-enter landing-v3-delay-5 mt-10 w-full max-w-[900px] overflow-hidden rounded-[20px] border border-[#E4DED5] bg-white/90 text-left shadow-[0_22px_60px_rgba(40,34,27,0.08)]">
+              <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">Thursday · 5h 10m usable</p>
+                  <p className="mt-1 text-sm font-semibold text-ink">A workable day, not a perfect one</p>
+                </div>
+                <span className="rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-semibold text-success">Validated</span>
+              </div>
+
+              <div className="grid gap-0 md:grid-cols-[1fr_1px_1.18fr]">
+                <div className="p-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">Next action</p>
+                  <h2 className="mt-2 text-lg font-semibold tracking-[-0.02em] text-ink">Authentication regression fix</h2>
+                  <p className="mt-1 text-sm text-muted">60 min · high impact · fits before team sync</p>
+                  <div className="mt-5 flex h-2 overflow-hidden rounded-full bg-[#EFEDE8]" aria-hidden="true">
+                    <span className="w-[46%] bg-accent" />
+                    <span className="w-[21%] bg-[#B8B5AE]" />
+                    <span className="w-[18%] bg-[#D7B58F]" />
+                  </div>
+                  <div className="mt-2 flex justify-between text-[10px] font-medium text-faint"><span>Focus</span><span>Meetings</span><span>Buffer kept</span></div>
+                </div>
+                <div className="hidden bg-line md:block" />
+                <div className="grid grid-cols-3 gap-3 p-5">
+                  <div><p className="text-[11px] text-faint">09:30</p><p className="mt-1 text-sm font-semibold text-ink">Deep work</p></div>
+                  <div><p className="text-[11px] text-faint">11:00</p><p className="mt-1 text-sm font-semibold text-ink">Team sync</p></div>
+                  <div><p className="text-[11px] text-faint">12:10</p><p className="mt-1 text-sm font-semibold text-ink">Review</p></div>
+                  <p className="col-span-3 mt-2 border-t border-line pt-3 text-xs leading-5 text-muted">Slides move to tomorrow because the original day exceeds capacity. Nothing changes without approval.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section id="control" className="landing-section landing-control" aria-labelledby="control-title">
-          <div className="landing-control-inner">
-            <div className="landing-control-copy">
-              <p className="landing-section-eyebrow landing-section-eyebrow-dark">Designed for control</p>
-              <h2 id="control-title">Helpful enough to adapt.<br />Bounded enough to trust.</h2>
-              <p>
-                ChronOS can explain a plan, surface context, and propose recovery. It cannot quietly rewrite your priorities or turn an external suggestion into an action without the right approval boundary.
-              </p>
-              <Link to="/guide" className="landing-control-link">
-                Read how ChronOS is designed <ArrowRight className="h-4 w-4" />
-              </Link>
+        <section id="how" className="border-b border-line bg-white py-20 sm:py-24">
+          <div className="mx-auto w-full max-w-[1120px] px-5 sm:px-7">
+            <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-20">
+              <div>
+                <p className="eyebrow">How it works</p>
+                <h2 className="mt-3 max-w-[520px] text-[clamp(2.2rem,4vw,3.7rem)] font-semibold leading-[1.02] tracking-[-0.05em] text-ink">Planning is a constraint problem. ChronOS treats it like one.</h2>
+                <p className="mt-5 max-w-[520px] text-base leading-7 text-muted">Language models help interpret ambiguity and explain trade-offs. Deterministic validation decides whether the plan can actually fit.</p>
+              </div>
+
+              <div className="divide-y divide-line border-y border-line">
+                {flow.map((item) => (
+                  <article key={item.step} className="grid gap-4 py-6 sm:grid-cols-[54px_1fr]">
+                    <span className="text-xs font-semibold text-accent-strong">{item.step}</span>
+                    <div><h3 className="text-base font-semibold text-ink">{item.title}</h3><p className="mt-2 text-sm leading-6 text-muted">{item.text}</p></div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="trust" className="bg-[#20201E] py-20 text-white">
+          <div className="mx-auto grid w-full max-w-[1120px] gap-10 px-5 sm:px-7 lg:grid-cols-[1fr_1fr] lg:gap-20">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#E7A36F]">Designed for control</p>
+              <h2 className="mt-3 max-w-[520px] text-[clamp(2.2rem,4vw,3.5rem)] font-semibold leading-[1.03] tracking-[-0.05em]">Helpful enough to adapt. Bounded enough to trust.</h2>
+              <p className="mt-5 max-w-[540px] text-sm leading-7 text-white/60">ChronOS can interpret, retrieve context, and propose. Feasibility rules, permissions, and approval boundaries decide what can actually change.</p>
+              <Link to="/guide" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#F0A56B]">Read the design approach <ArrowRight className="h-4 w-4" /></Link>
             </div>
 
-            <div className="landing-control-grid">
-              <div className="landing-control-item">
-                <ShieldCheck className="h-5 w-5" />
-                <div>
-                  <strong>Approval-first actions</strong>
-                  <span>Consequential changes stay visible before they happen.</span>
-                </div>
-              </div>
-              <div className="landing-control-item">
-                <TimerReset className="h-5 w-5" />
-                <div>
-                  <strong>Graceful recovery</strong>
-                  <span>Missed work becomes a decision, not a silent reshuffle.</span>
-                </div>
-              </div>
-              <div className="landing-control-item">
-                <Sparkles className="h-5 w-5" />
-                <div>
-                  <strong>Attributable context</strong>
-                  <span>Recommendations can show which memory, note, or constraint influenced them.</span>
-                </div>
-              </div>
+            <div className="divide-y divide-white/10 border-y border-white/10">
+              {[
+                [ShieldCheck, 'Approval-first actions', 'Consequential changes stay visible before they happen.'],
+                [TimerReset, 'Graceful recovery', 'A missed block becomes a decision, not a silent reshuffle.'],
+                [Sparkles, 'Attributable context', 'Relevant memory and knowledge can be inspected at the source.'],
+              ].map(([Icon, title, text]) => {
+                const C = Icon as typeof ShieldCheck;
+                return <div key={String(title)} className="grid grid-cols-[28px_1fr] gap-4 py-5"><C className="mt-0.5 h-5 w-5 text-[#F0A56B]" /><div><h3 className="text-sm font-semibold">{String(title)}</h3><p className="mt-1 text-xs leading-5 text-white/55">{String(text)}</p></div></div>;
+              })}
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="landing-footer">
-        <div className="landing-footer-inner">
-          <Link to="/" className="landing-brand landing-brand-footer" aria-label="ChronOS home">
-            <BrandMark className="h-8 w-8 rounded-[10px]" />
-            <span>Chron<span className="text-accent">OS</span></span>
-          </Link>
+      <footer className="border-t border-line bg-[#FAFAF8] py-7">
+        <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center justify-between gap-4 px-5 text-xs text-faint sm:flex-row sm:px-7">
+          <div className="inline-flex items-center gap-2"><ChronOSMark size={28} /><span className="font-semibold text-ink">Chron<span className="text-accent">OS</span></span></div>
           <p>A personal execution system for plans that have to survive reality.</p>
-          <div className="landing-footer-links">
-            <Link to="/guide">About</Link>
-            <Link to="/demo">Demo</Link>
-            <a href="https://github.com/Dhruvg334/ChronOS" target="_blank" rel="noreferrer">GitHub</a>
-          </div>
+          <div className="flex gap-5"><Link to="/guide">About</Link><Link to="/demo">Demo</Link><a href="https://github.com/Dhruvg334/ChronOS" target="_blank" rel="noreferrer">GitHub</a></div>
         </div>
       </footer>
     </div>

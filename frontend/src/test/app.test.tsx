@@ -13,6 +13,7 @@ import Settings from '../pages/Settings';
 import Today from '../pages/Today';
 import Onboarding from '../pages/Onboarding';
 import Inbox from '../pages/Inbox';
+import Landing from '../pages/Landing';
 import { CommitmentDraftCard } from '../components/intake/CommitmentDraftCard';
 import type { ActiveFocusSession, PlanResponse, TodayResponse } from '../types/api';
 
@@ -124,6 +125,13 @@ function renderWithContext(ui: React.ReactNode, { path = '/', authenticated = tr
   const view = render(<QueryClientProvider client={client}><AuthContext.Provider value={auth}><MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter></AuthContext.Provider></QueryClientProvider>);
   return { ...view, client };
 }
+
+it('renders the public landing experience without a blank root', () => {
+  renderWithContext(<Landing />, { path: '/', authenticated: false });
+  expect(screen.getByRole('heading', { name: /plan the day you can actually execute/i })).toBeInTheDocument();
+  expect(screen.getAllByRole('link', { name: /start planning/i }).length).toBeGreaterThanOrEqual(1);
+  expect(screen.getByText(/a workable day, not a perfect one/i)).toBeInTheDocument();
+});
 
 it('shows an accessible fallback while a lazy route loads', async () => {
   renderWithContext(<AppRoutes />, { path: '/guide', authenticated: false });

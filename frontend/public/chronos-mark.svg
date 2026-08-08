@@ -1,8 +1,9 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M16 4.75C9.7868 4.75 4.75 9.7868 4.75 16C4.75 22.2132 9.7868 27.25 16 27.25C20.3628 27.25 24.1455 24.7658 26.0094 21.133" stroke="#E77825" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M23.2637 7.43359C25.1227 9.15469 26.4235 11.4912 26.8159 14.1163" stroke="#E77825" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M16 9.25V14.75" stroke="#F9E8D8" stroke-width="2.4" stroke-linecap="round"/>
-  <rect x="12.25" y="14" width="7.5" height="4" rx="1.35" fill="#F9E8D8"/>
-  <rect x="16.25" y="19.25" width="6.5" height="3.5" rx="1.2" fill="#E77825"/>
-  <circle cx="16" cy="9" r="1.5" fill="#E77825"/>
+  <path d="M23.7 7.2C21.6 5.25 18.78 4.05 15.68 4.05C9.16 4.05 3.88 9.33 3.88 15.85C3.88 22.37 9.16 27.65 15.68 27.65C18.9 27.65 21.82 26.36 23.95 24.27" stroke="white" stroke-width="2.65" stroke-linecap="round"/>
+  <path d="M14.2 9.35H23.9" stroke="white" stroke-width="2.35" stroke-linecap="round"/>
+  <path d="M11.65 15.85H21.35" stroke="white" stroke-width="2.35" stroke-linecap="round"/>
+  <path d="M14.2 22.35H23.9" stroke="white" stroke-width="2.35" stroke-linecap="round"/>
+  <circle cx="24.05" cy="9.35" r="1.55" fill="white"/>
+  <circle cx="21.5" cy="15.85" r="1.55" fill="white"/>
+  <circle cx="24.05" cy="22.35" r="1.55" fill="white"/>
 </svg>
